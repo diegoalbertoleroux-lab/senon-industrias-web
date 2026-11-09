@@ -3,176 +3,308 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel Admin | Senon Industrias</title>
+    <title>ERP | Senon Industrias</title>
     <link rel="stylesheet" href="css/styles.css">
-    <!-- Librerías para PDF y Gráficos -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
-    <div id="admin-login" class="login-split-container">
-        <div class="login-left">
-            <div class="login-left-content">
-                <div class="brand-logo-large">SENON</div>
-                <div class="brand-subtext-large">INDUSTRIAS</div>
-                <p class="brand-slogan">Sistema de Gestión B2B.</p>
-            </div>
-            <div class="login-footer-left">Senon Industrias · RIF J-50719484-1</div>
-        </div>
-        <div class="login-right">
-            <div class="login-form-box">
-                <h1 class="login-title">INICIAR SESIÓN</h1>
-                <div id="login-msg" class="message"></div>
-                <form id="form-admin-login">
-                    <div class="form-group"><label>USUARIO</label><input type="email" id="admin-email" class="form-control" required></div>
-                    <div class="form-group"><label>CONTRASEÑA</label><input type="password" id="admin-password" class="form-control" required></div>
-                    <button type="submit" class="btn-entrar" id="btn-admin-login">ENTRAR</button>
-                </form>
-            </div>
+    <!-- PANTALLA DE LOGIN -->
+    <div id="admin-login" class="login-screen">
+        <div class="login-box">
+            <img src="img/logo.png" alt="Senon" style="max-width: 150px; margin-bottom: 20px;">
+            <h2>Acceso Administrativo</h2>
+            <div id="login-msg" class="message"></div>
+            <form id="form-admin-login">
+                <div class="form-group"><input type="email" id="admin-email" class="form-control" placeholder="Correo" required></div>
+                <div class="form-group"><input type="password" id="admin-password" class="form-control" placeholder="Contraseña" required></div>
+                <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+            </form>
         </div>
     </div>
 
-    <div id="admin-main" style="display: none;">
-        <header class="admin-header">
-            <div class="logo-container"><div class="logo-text">SENON <span style="font-size:14px; color:var(--primary);">ADMIN</span></div></div>
-            <div style="display: flex; gap: 15px; align-items: center;">
-                <span id="tasa-bcv-display" style="font-weight:bold; color:var(--success); font-size:14px;">Cargando tasa...</span>
-                <a href="index.html" class="btn-outline" target="_blank">Ver Catálogo</a>
-                <button id="btn-logout" class="btn-danger">Cerrar Sesión</button>
+    <!-- APP PRINCIPAL -->
+    <div id="app-main" style="display: none; width: 100%;">
+        
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <img src="img/logo.png" alt="Senon">
+                <h2>ERP ADMIN</h2>
             </div>
-        </header>
-
-        <main class="admin-container">
-            <div class="admin-tabs">
-                <button class="admin-tab active" data-target="tab-dashboard">Dashboard</button>
-                <button class="admin-tab" data-target="tab-cotizaciones">Cotizaciones</button>
-                <button class="admin-tab" data-target="tab-servicio">Servicio Técnico</button>
-                <button class="admin-tab" data-target="tab-inventario">Inventario</button>
-                <button class="admin-tab" data-target="tab-clientes">Clientes</button>
+            <nav class="sidebar-menu">
+                <a class="menu-item active" data-view="view-dashboard">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                    Dashboard
+                </a>
+                <a class="menu-item" data-view="view-cotizaciones">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    Cotizaciones
+                </a>
+                <a class="menu-item" data-view="view-facturas">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 8h6m-5 0a3 3 0 110 6H9l3 3m-3-6h6m6 1a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Facturación Manual
+                </a>
+                <a class="menu-item" data-view="view-inventario">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                    Inventario
+                </a>
+                <a class="menu-item" data-view="view-clientes">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    Clientes
+                </a>
+                <a class="menu-item" data-view="view-proveedores">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                    Proveedores
+                </a>
+                <a class="menu-item" data-view="view-servicio">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    Servicio Técnico
+                </a>
+                <a class="menu-item" data-view="view-cuentas">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Cuentas
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="btn-logout" class="btn btn-danger w-100">Cerrar Sesión</button>
             </div>
+        </aside>
 
-            <!-- DASHBOARD Y FINANZAS -->
-            <div id="tab-dashboard" class="admin-section active">
-                <div class="grid-layout" style="grid-template-columns: 1fr 1fr;">
+        <!-- CONTENIDO -->
+        <main class="main-content">
+            <header class="topbar">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="menu-toggle" id="menu-toggle">☰</button>
+                    <h1 class="page-title" id="page-title">Dashboard</h1>
+                </div>
+                <div class="topbar-actions">
+                    <div class="tasa-display" id="tasa-display">Tasa: Cargando...</div>
+                </div>
+            </header>
+
+            <!-- VISTA: DASHBOARD -->
+            <section id="view-dashboard" class="view-section active">
+                <div class="grid-3">
                     <div class="card">
-                        <h2>Resumen Financiero (USD)</h2>
-                        <div style="display: flex; gap: 20px; margin-bottom: 20px;">
-                            <div style="flex:1; background:var(--input-bg); padding:15px; border-radius:8px;">
-                                <small>Ingresos Estimados</small>
-                                <h3 style="color:var(--success); font-size:24px;" id="stat-ingresos">$0.00</h3>
-                            </div>
-                            <div style="flex:1; background:var(--input-bg); padding:15px; border-radius:8px;">
-                                <small>Ganancia Neta</small>
-                                <h3 style="color:var(--primary); font-size:24px;" id="stat-ganancia">$0.00</h3>
-                            </div>
-                        </div>
-                        <canvas id="salesChart" height="150"></canvas>
+                        <h3>Ingresos (USD)</h3>
+                        <h2 id="dash-ingresos" style="color: var(--success); font-size: 28px;">$0.00</h2>
                     </div>
                     <div class="card">
-                        <h2>Registrar Gasto / Costo Operativo</h2>
-                        <div id="gasto-message" class="message"></div>
-                        <form id="form-gasto">
-                            <div class="form-group"><label>Concepto</label><input type="text" id="gasto-desc" class="form-control" placeholder="Ej. Pago de envío" required></div>
-                            <div class="form-group"><label>Monto (USD)</label><input type="number" step="0.01" id="gasto-monto" class="form-control" required></div>
-                            <button type="submit" class="btn-primary btn-full" id="btn-save-gasto">Registrar Egreso</button>
-                        </form>
+                        <h3>Ganancia Estimada</h3>
+                        <h2 id="dash-ganancia" style="color: var(--primary); font-size: 28px;">$0.00</h2>
+                    </div>
+                    <div class="card">
+                        <h3>Cotizaciones Pendientes</h3>
+                        <h2 id="dash-pendientes" style="font-size: 28px;">0</h2>
                     </div>
                 </div>
-            </div>
-
-            <!-- COTIZACIONES -->
-            <div id="tab-cotizaciones" class="admin-section">
                 <div class="card">
-                    <h2>Solicitudes de Cotización</h2>
+                    <h3>Ventas vs Costos (Últimos meses)</h3>
+                    <canvas id="chart-ventas" height="80"></canvas>
+                </div>
+            </section>
+
+            <!-- VISTA: COTIZACIONES -->
+            <section id="view-cotizaciones" class="view-section">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Solicitudes de Cotización</h2>
+                        <button class="btn btn-primary" onclick="abrirModalManual()">Crear Cotización Manual</button>
+                    </div>
                     <div class="table-responsive">
                         <table class="table-pro">
                             <thead><tr><th>Fecha</th><th>Cliente</th><th>Productos</th><th>Estado</th><th>Acciones</th></tr></thead>
-                            <tbody id="table-cotizaciones"></tbody>
+                            <tbody id="tbody-cotizaciones"></tbody>
                         </table>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- SERVICIO TÉCNICO -->
-            <div id="tab-servicio" class="admin-section">
+            <!-- VISTA: FACTURAS -->
+            <section id="view-facturas" class="view-section">
                 <div class="card">
-                    <h2>Tickets de Reparación</h2>
-                    <div class="table-responsive">
-                        <table class="table-pro">
-                            <thead><tr><th>Cliente</th><th>Equipo</th><th>Falla</th><th>Estado</th><th>Acción</th></tr></thead>
-                            <tbody id="table-servicio"></tbody>
-                        </table>
+                    <h2>Calculadora de Facturación Manual</h2>
+                    <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">Calcula Base Imponible, IVA (16%), IGTF y totales en Bs. para pasarlos a tu talonario manual.</p>
+                    <div class="grid-2">
+                        <div>
+                            <div class="form-group"><label>Base Imponible (USD)</label><input type="number" id="fac-base" class="form-control" step="0.01" oninput="calcularFactura()"></div>
+                            <div class="form-group"><label>Monto Exento (USD)</label><input type="number" id="fac-exento" class="form-control" step="0.01" oninput="calcularFactura()"></div>
+                        </div>
+                        <div style="background:var(--input-bg); padding:20px; border-radius:8px;">
+                            <p><strong>IVA (16%):</strong> <span id="fac-iva-usd">$0.00</span></p>
+                            <p><strong>IGTF (3%):</strong> <span id="fac-igtf-usd">$0.00</span></p>
+                            <hr style="margin:10px 0; border:0; border-top:1px solid var(--border-color);">
+                            <h3>Total USD: <span id="fac-total-usd">$0.00</span></h3>
+                            <h3 style="color:var(--primary);">Total Bs: <span id="fac-total-ves">Bs. 0.00</span></h3>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- INVENTARIO -->
-            <div id="tab-inventario" class="admin-section">
-                <div class="grid-layout">
+            <!-- VISTA: INVENTARIO -->
+            <section id="view-inventario" class="view-section">
+                <div class="grid-2">
                     <div class="card">
-                        <h2>Añadir Producto</h2>
-                        <div id="admin-message" class="message"></div>
-                        <form id="form-product">
-                            <div class="form-group"><label>Nombre</label><input type="text" id="prod-nombre" class="form-control" required></div>
-                            <div class="form-group"><label>Categoría</label>
-                                <select id="prod-categoria" class="form-control" required>
-                                    <option value="Bioquimica">Bioquímica</option><option value="Hematologia">Hematología</option>
-                                    <option value="Coagulacion">Coagulación</option><option value="Serologia">Serología</option>
-                                </select>
+                        <h2>Ajuste Masivo de Precios</h2>
+                        <p style="font-size:12px; margin-bottom:15px;">Aplica un % a los precios actuales.</p>
+                        <div class="form-group"><label>Porcentaje (%)</label><input type="number" id="ajuste-porcentaje" class="form-control" placeholder="Ej. -10 para restar, 5 para sumar"></div>
+                        <select id="ajuste-nivel" class="form-control" style="margin-bottom:15px;">
+                            <option value="precio_A">Precio A (Base)</option>
+                            <option value="precio_B">Precio B (-5%)</option>
+                            <option value="precio_C">Precio C (-10%)</option>
+                            <option value="precio_D">Precio D (-15%)</option>
+                        </select>
+                        <button class="btn btn-primary w-100" onclick="aplicarAjusteMasivo()">Aplicar Ajuste</button>
+                    </div>
+                    <div class="card">
+                        <h2>Nuevo Producto</h2>
+                        <div id="msg-inventario" class="message"></div>
+                        <form id="form-producto">
+                            <div class="grid-2">
+                                <div class="form-group"><label>Código / SKU</label><input type="text" id="inv-codigo" class="form-control" required></div>
+                                <div class="form-group"><label>Marca</label><input type="text" id="inv-marca" class="form-control" required></div>
                             </div>
-                            <div class="form-group"><label>Descripción</label><textarea id="prod-desc" class="form-control" required></textarea></div>
-                            
-                            <div class="form-group" style="background:#fef3c7; padding:10px; border-radius:8px;">
-                                <label style="color:#b45309;">Costo de Compra (USD) - Privado</label>
-                                <input type="number" step="0.01" id="prod-costo" class="form-control" required>
-                            </div>
-
-                            <div class="form-group"><label style="color:var(--primary);">Precios de Venta (USD)</label>
-                                <div class="grid-precios">
-                                    <div><label>A</label><input type="number" step="0.01" id="prod-pA" class="form-control" required></div>
-                                    <div><label>B</label><input type="number" step="0.01" id="prod-pB" class="form-control" required></div>
-                                    <div><label>C</label><input type="number" step="0.01" id="prod-pC" class="form-control" required></div>
-                                    <div><label>D</label><input type="number" step="0.01" id="prod-pD" class="form-control" required></div>
+                            <div class="form-group"><label>Nombre</label><input type="text" id="inv-nombre" class="form-control" required></div>
+                            <div class="grid-2">
+                                <div class="form-group"><label>Categoría</label>
+                                    <select id="inv-categoria" class="form-control">
+                                        <option>Miscelaneos</option><option>Pruebas Rapidas</option><option>Quimioluminiscencia</option>
+                                        <option>Reactivos IDG</option><option>Serologia</option><option>Bioquimica Clinica</option>
+                                        <option>Citest</option><option>Equipos</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-top:25px;">
+                                    <input type="checkbox" id="inv-exento" style="width:20px; height:20px;">
+                                    <label style="margin:0;">Producto Exento de IVA</label>
                                 </div>
                             </div>
-                            <button type="submit" class="btn-primary btn-full" id="btn-save">Guardar</button>
+                            <div class="form-group"><label>Costo (USD)</label><input type="number" step="0.01" id="inv-costo" class="form-control" required></div>
+                            <div class="grid-2">
+                                <div class="form-group"><label>Precio A</label><input type="number" step="0.01" id="inv-pA" class="form-control" required></div>
+                                <div class="form-group"><label>Stock Inicial</label><input type="number" id="inv-stock" class="form-control" value="0"></div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Guardar Producto</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="card" style="margin-top:20px;">
+                    <div class="card-header">
+                        <h2>Inventario Actual</h2>
+                        <button class="btn btn-outline" onclick="exportarListaPrecios()">Exportar Lista de Precios (PDF)</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table-pro">
+                            <thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th>Costo</th><th>Precio A</th><th>Exento</th></tr></thead>
+                            <tbody id="tbody-inventario"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VISTA: CLIENTES -->
+            <section id="view-clientes" class="view-section">
+                <div class="card">
+                    <h2>Directorio de Clientes</h2>
+                    <div class="table-responsive">
+                        <table class="table-pro">
+                            <thead><tr><th>Laboratorio</th><th>RIF</th><th>Contacto</th><th>Estado</th><th>Acciones</th></tr></thead>
+                            <tbody id="tbody-clientes"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VISTA: PROVEEDORES Y COMPRAS -->
+            <section id="view-proveedores" class="view-section">
+                <div class="grid-2">
+                    <div class="card">
+                        <h2>Registrar Proveedor</h2>
+                        <form id="form-proveedor">
+                            <div class="form-group"><label>Nombre</label><input type="text" id="prov-nombre" class="form-control" required></div>
+                            <div class="form-group"><label>RIF</label><input type="text" id="prov-rif" class="form-control" required></div>
+                            <div class="form-group"><label>Contacto</label><input type="text" id="prov-contacto" class="form-control"></div>
+                            <button type="submit" class="btn btn-primary w-100">Guardar Proveedor</button>
                         </form>
                     </div>
                     <div class="card">
-                        <h2>Productos</h2>
-                        <div class="table-responsive"><table class="table-pro"><thead><tr><th>Producto</th><th>Categoría</th></tr></thead><tbody id="table-body"></tbody></table></div>
+                        <h2>Registrar Compra</h2>
+                        <form id="form-compra">
+                            <div class="form-group"><label>Proveedor</label><select id="compra-proveedor" class="form-control"></select></div>
+                            <div class="form-group"><label>Monto Total (USD)</label><input type="number" step="0.01" id="compra-monto" class="form-control" required></div>
+                            <button type="submit" class="btn btn-primary w-100">Registrar Compra</button>
+                        </form>
                     </div>
                 </div>
-            </div>
-
-            <!-- CLIENTES -->
-            <div id="tab-clientes" class="admin-section">
-                <div class="card">
-                    <h2>Clientes</h2>
-                    <div class="table-responsive"><table class="table-pro"><thead><tr><th>Lab</th><th>RIF</th><th>Contacto</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="table-clientes"></tbody></table></div>
+                <div class="card" style="margin-top:20px;">
+                    <h2>Historial de Compras</h2>
+                    <div class="table-responsive">
+                        <table class="table-pro">
+                            <thead><tr><th>Fecha</th><th>Proveedor</th><th>Monto USD</th></tr></thead>
+                            <tbody id="tbody-compras"></tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
+            </section>
+
+            <!-- VISTA: SERVICIO TÉCNICO -->
+            <section id="view-servicio" class="view-section">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Tickets de Servicio</h2>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table-pro">
+                            <thead><tr><th>Cliente</th><th>Equipo</th><th>Falla</th><th>Estado</th><th>Acciones</th></tr></thead>
+                            <tbody id="tbody-servicio"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VISTA: CUENTAS POR COBRAR/PAGAR -->
+            <section id="view-cuentas" class="view-section">
+                <div class="grid-2">
+                    <div class="card">
+                        <h2>Cuentas por Cobrar (Clientes)</h2>
+                        <form id="form-cxc" style="margin-bottom:15px;">
+                            <select id="cxc-cliente" class="form-control" style="margin-bottom:10px;"></select>
+                            <input type="number" id="cxc-monto" class="form-control" placeholder="Monto USD" style="margin-bottom:10px;" required>
+                            <button type="submit" class="btn btn-primary w-100">Registrar Deuda</button>
+                        </form>
+                        <div class="table-responsive"><table class="table-pro"><thead><tr><th>Cliente</th><th>Monto</th><th>Estado</th></tr></thead><tbody id="tbody-cxc"></tbody></table></div>
+                    </div>
+                    <div class="card">
+                        <h2>Cuentas por Pagar (Proveedores)</h2>
+                        <form id="form-cxp" style="margin-bottom:15px;">
+                            <select id="cxp-proveedor" class="form-control" style="margin-bottom:10px;"></select>
+                            <input type="number" id="cxp-monto" class="form-control" placeholder="Monto USD" style="margin-bottom:10px;" required>
+                            <button type="submit" class="btn btn-primary w-100">Registrar Deuda</button>
+                        </form>
+                        <div class="table-responsive"><table class="table-pro"><thead><tr><th>Proveedor</th><th>Monto</th><th>Estado</th></tr></thead><tbody id="tbody-cxp"></tbody></table></div>
+                    </div>
+                </div>
+            </section>
+
         </main>
     </div>
 
-    <!-- MODAL PARA COTIZAR (ADMIN) -->
-    <div class="modal-overlay" id="modal-quote">
-        <div class="modal-content" style="max-width: 600px;">
-            <button class="close-modal" id="close-quote">×</button>
-            <h2>Asignar Precios a Cotización</h2>
-            <div id="quote-details" style="margin-bottom:20px; background:var(--input-bg); padding:15px; border-radius:8px;"></div>
+    <!-- MODAL: PROCESAR COTIZACIÓN -->
+    <div class="modal-overlay" id="modal-cotizar">
+        <div class="modal-content">
+            <button class="close-modal" onclick="document.getElementById('modal-cotizar').classList.remove('active')">×</button>
+            <h2>Procesar Cotización</h2>
+            <div id="cotizar-detalles" style="margin-bottom:20px; background:var(--input-bg); padding:15px; border-radius:8px;"></div>
             <div class="form-group">
                 <label>Seleccionar Nivel de Precio</label>
-                <select id="quote-price-level" class="form-control">
-                    <option value="precio_A">Nivel A</option>
-                    <option value="precio_B">Nivel B</option>
-                    <option value="precio_C">Nivel C</option>
-                    <option value="precio_D">Nivel D</option>
+                <select id="cotizar-nivel" class="form-control">
+                    <option value="precio_A">Nivel A (Base)</option><option value="precio_B">Nivel B (-5%)</option>
+                    <option value="precio_C">Nivel C (-10%)</option><option value="precio_D">Nivel D (-15%)</option>
                 </select>
             </div>
-            <button class="btn-primary btn-full" id="btn-save-quote">Procesar y Generar PDF</button>
+            <button class="btn btn-primary w-100" onclick="guardarCotizacion()">Generar PDF y Guardar</button>
         </div>
     </div>
 
