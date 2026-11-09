@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Senon Industrias | Portal B2B</title>
+</head>
+<body>
+
+    <header style="text-align: center; padding: 50px;">
+        <h1>Portal de Clientes - Senon Industrias</h1>
+        <p>RIF: J-50719484-1</p>
+        <p id="estado-conexion" style="color: orange; font-weight: bold;">
+            Comprobando conexión con la base de datos...
+        </p>
+    </header>
+
+    <!-- Conectamos nuestro archivo de configuración -->
+    <script type="module">
+        import { db } from './js/firebase-config.js';
+        
+        const estado = document.getElementById('estado-conexion');
+        estado.textContent = "✅ ¡Conexión exitosa con Firebase!";
+        estado.style.color = "green";
+    </script>
+</body>
+</html>
