@@ -88,3 +88,14 @@ main { padding: 40px 5%; max-width: 1400px; margin: 0 auto; }
 .cart-btn { position: fixed; bottom: 30px; right: 30px; background: var(--primary); color: white; width: 60px; height: 60px; border-radius: 50%; display: flex; justify-content: center; align-items: center; box-shadow: 0 10px 20px rgba(232, 106, 36, 0.4); cursor: pointer; border: none; font-size: 24px; z-index: 90; transition: transform 0.2s; }
 .cart-btn:hover { transform: scale(1.1); }
 .cart-count { position: absolute; top: -5px; right: -5px; background: var(--secondary); color: white; font-size: 12px; width: 24px; height: 24px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; }
+/* Estilos extra para el Admin */
+.admin-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); }
+.admin-tab { padding: 10px 20px; background: none; border: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; }
+.admin-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.admin-section { display: none; }
+.admin-section.active { display: block; }
+.grid-precios { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.btn-danger { background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.btn-success { background: #22c55e; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+/* Ocultar el admin principal hasta que se loguee */
+#admin-main { display: none; }
