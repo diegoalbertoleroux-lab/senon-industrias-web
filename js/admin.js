@@ -92,7 +92,7 @@ window.filtrarInventario = () => {
         if (cat === "" || p.categoria === cat) {
             tbody.innerHTML += `
                 <tr>
-                    <td>${p.codigo || '-'}</td><td>${p.nombre}</td><td>${p.proveedor || '-'}</td>
+                    <td>${p.codigo || '-'}</td><td>${p.nombre || 'Sin nombre'}</td><td>${p.proveedor || '-'}</td>
                     <td style="color: ${p.stock <= 5 ? '#ef4444' : 'inherit'}; font-weight: ${p.stock <= 5 ? 'bold' : 'normal'};">${p.stock || 0}</td>
                     <td>$${(p.precio_A || 0).toFixed(2)}</td>
                     <td><button class="btn btn-outline btn-sm" onclick="editarProducto('${p.id}')">Editar</button></td>
@@ -153,7 +153,6 @@ document.getElementById('form-producto').addEventListener('submit', async (e) =>
 window.exportarListaPrecios = (nivel, titulo) => {
     const { jsPDF } = window.jspdf; const doc = new jsPDF();
     
-    // MEMBRETE ALINEADO
     doc.addImage('img/logo.png', 'PNG', 14, 10, 40, 15);
     doc.setFontSize(9); doc.setTextColor(80);
     doc.text("R.I.F: J-50719484-1 | Telf: 0414-3549096", 196, 15, { align: "right" });
@@ -174,7 +173,7 @@ window.exportarListaPrecios = (nivel, titulo) => {
         doc.setFontSize(11); doc.setFont("helvetica", "bold");
         doc.text(cat.toUpperCase(), 14, currentY);
         
-        const filas = agrupados[cat].map(p => [ p.codigo || '-', p.nombre, `$${p[nivel].toFixed(2)}`, `Bs. ${(p[nivel] * TASA_BCV).toFixed(2)}` ]);
+        const filas = agrupados[cat].map(p => [ p.codigo || '-', p.nombre || '-', `$${(p[nivel] || 0).toFixed(2)}`, `Bs. ${((p[nivel] || 0) * TASA_BCV).toFixed(2)}` ]);
 
         doc.autoTable({
             startY: currentY + 5, head: [["Código", "Producto", "Precio USD", "Precio Bs."]],
@@ -187,7 +186,7 @@ window.exportarListaPrecios = (nivel, titulo) => {
     doc.save(`Lista_Precios_${nivel}.pdf`);
 };
 
-// --- 2. COTIZACIONES Y BUSCADORES (FUNCIONES GLOBALES) ---
+// --- 2. COTIZACIONES (BUSCADOR BLINDADO) ---
 async function cargarCotizaciones() {
     const tbody = document.getElementById('tbody-cotizaciones');
     const snap = await getDocs(collection(db, "cotizaciones"));
@@ -242,20 +241,31 @@ window.cambiarNivelCliente = () => {
     }
 };
 
-// ESTA FUNCION SE LLAMA DIRECTO DESDE EL HTML
+// BUSCADOR MANUAL BLINDADO (Usa ?. para evitar errores si falta un dato)
 window.buscarProductoManual = (query) => {
-    const q = query.toLowerCase(); const resDiv = document.getElementById('res-manual');
+    const q = (query || '').toLowerCase().trim(); 
+    const resDiv = document.getElementById('res-manual');
+    
     if (q.length < 1) { resDiv.style.display = 'none'; return; }
-    // Si por alguna razon el cache esta vacio, avisamos
+    
     if (Object.keys(PRODUCTOS_CACHE).length === 0) {
-        resDiv.innerHTML = '<div class="search-item" style="color:red;">Cargando inventario, espere 2 segundos...</div>';
+        resDiv.innerHTML = '<div class="search-item" style="color:#ef4444; font-weight:bold;">⚠️ La base de datos está vacía o cargando. Ve a Inventario primero.</div>';
         resDiv.style.display = 'block'; return;
     }
-    const matches = Object.values(PRODUCTOS_CACHE).filter(p => p.nombre.toLowerCase().includes(q) || (p.codigo && p.codigo.toLowerCase().includes(q))).slice(0, 5);
+    
+    const matches = Object.values(PRODUCTOS_CACHE).filter(p => {
+        const nombre = (p.nombre || '').toLowerCase();
+        const codigo = (p.codigo || '').toLowerCase();
+        return nombre.includes(q) || codigo.includes(q);
+    }).slice(0, 10); // Muestra hasta 10 resultados
+
     if (matches.length > 0) {
-        resDiv.innerHTML = matches.map(p => `<div class="search-item" onclick="agregarManual('${p.id}')"><strong>${p.nombre}</strong> - $${p.precio_A}</div>`).join('');
+        resDiv.innerHTML = matches.map(p => `<div class="search-item" onclick="agregarManual('${p.id}')"><strong>${p.nombre || 'Sin nombre'}</strong> - $${(p.precio_A || 0).toFixed(2)}</div>`).join('');
         resDiv.style.display = 'block';
-    } else { resDiv.innerHTML = '<div class="search-item">No encontrado</div>'; resDiv.style.display = 'block'; }
+    } else { 
+        resDiv.innerHTML = '<div class="search-item" style="color:#666;">No se encontraron productos con esa letra.</div>'; 
+        resDiv.style.display = 'block'; 
+    }
 };
 
 window.agregarManual = (id) => {
@@ -319,7 +329,6 @@ window.generarPDF = (str, tipo) => {
     const c = JSON.parse(decodeURIComponent(str));
     const { jsPDF } = window.jspdf; const doc = new jsPDF();
     
-    // MEMBRETE
     doc.addImage('img/logo.png', 'PNG', 14, 10, 35, 15);
     doc.setFontSize(9); doc.setTextColor(80);
     doc.text("R.I.F: J-50719484-1 | Telf: 0414-3549096", 196, 15, { align: "right" });
@@ -397,19 +406,31 @@ document.getElementById('form-proveedor').addEventListener('submit', async (e) =
     document.getElementById('form-proveedor').reset(); cargarClientesYProveedores();
 });
 
-// FUNCION DE COMPRAS DIRECTA DESDE EL HTML
+// BUSCADOR COMPRAS BLINDADO
 window.buscarProductoCompra = (query) => {
-    const q = query.toLowerCase(); const resDiv = document.getElementById('res-compra');
+    const q = (query || '').toLowerCase().trim(); 
+    const resDiv = document.getElementById('res-compra');
+    
     if (q.length < 1) { resDiv.style.display = 'none'; return; }
+    
     if (Object.keys(PRODUCTOS_CACHE).length === 0) {
-        resDiv.innerHTML = '<div class="search-item" style="color:red;">Cargando...</div>';
+        resDiv.innerHTML = '<div class="search-item" style="color:#ef4444; font-weight:bold;">⚠️ La base de datos está vacía o cargando.</div>';
         resDiv.style.display = 'block'; return;
     }
-    const matches = Object.values(PRODUCTOS_CACHE).filter(p => p.nombre.toLowerCase().includes(q) || (p.codigo && p.codigo.toLowerCase().includes(q))).slice(0, 5);
+    
+    const matches = Object.values(PRODUCTOS_CACHE).filter(p => {
+        const nombre = (p.nombre || '').toLowerCase();
+        const codigo = (p.codigo || '').toLowerCase();
+        return nombre.includes(q) || codigo.includes(q);
+    }).slice(0, 10);
+
     if (matches.length > 0) {
-        resDiv.innerHTML = matches.map(p => `<div class="search-item" onclick="agregarCompra('${p.id}')"><strong>${p.nombre}</strong> - Costo: $${p.costo}</div>`).join('');
+        resDiv.innerHTML = matches.map(p => `<div class="search-item" onclick="agregarCompra('${p.id}')"><strong>${p.nombre || 'Sin nombre'}</strong> - Costo: $${(p.costo || 0).toFixed(2)}</div>`).join('');
         resDiv.style.display = 'block';
-    } else { resDiv.innerHTML = '<div class="search-item">No encontrado</div>'; resDiv.style.display = 'block'; }
+    } else { 
+        resDiv.innerHTML = '<div class="search-item" style="color:#666;">No encontrado.</div>'; 
+        resDiv.style.display = 'block'; 
+    }
 };
 
 window.agregarCompra = (id) => {
@@ -446,7 +467,7 @@ document.getElementById('form-compra').addEventListener('submit', async (e) => {
     Swal.fire({ title: '¡Compra Registrada!', text: 'Stock sumado.', icon: 'success', timer: 2000, showConfirmButton: false });
 });
 
-// --- 5. SERVICIO TÉCNICO CON PDF EDITABLE ---
+// --- 5. SERVICIO TÉCNICO ---
 document.getElementById('form-reparacion-manual').addEventListener('submit', async (e) => {
     e.preventDefault();
     await addDoc(collection(db, "tickets_servicio"), { 
@@ -544,12 +565,10 @@ document.getElementById('form-gasto').addEventListener('submit', async (e) => {
 });
 
 async function cargarGastosYGrafica() {
-    // 1. Sumar gastos
     const gastosSnap = await getDocs(collection(db, "gastos"));
     TOTAL_GASTOS = 0;
     gastosSnap.forEach(d => TOTAL_GASTOS += d.data().monto);
 
-    // 2. Sacar datos de ventas
     const snap = await getDocs(collection(db, "cotizaciones"));
     let ventasSemana = [0,0,0,0,0,0,0];
     let totalVentas = 0;
@@ -562,7 +581,6 @@ async function cargarGastosYGrafica() {
         }
     });
 
-    // 3. Actualizar Dashboard
     if(document.getElementById('dash-ganancia')) {
         document.getElementById('dash-ganancia').textContent = `$${(totalVentas - TOTAL_GASTOS).toFixed(2)}`;
     }
