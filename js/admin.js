@@ -1,126 +1,157 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel Admin | Senon Industrias</title>
-    <link rel="stylesheet" href="css/styles.css">
-</head>
-<body>
+import { auth, db } from './firebase-config.js';
+import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { collection, addDoc, getDocs, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    <!-- PANTALLA DE LOGIN (Bloquea todo hasta iniciar sesión) -->
-    <div id="admin-login" class="auth-container" style="display: flex; height: 100vh; max-width: 100%; background: var(--bg-color);">
-        <div class="auth-card">
-            <div class="logo-container" style="text-align: center; margin-bottom: 20px;">
-                <div class="logo-text">SENON</div>
-                <div class="logo-subtext">PANEL DE ADMINISTRACIÓN</div>
-            </div>
-            <div id="login-msg" class="message"></div>
-            <form id="form-admin-login">
-                <div class="form-group">
-                    <label>Correo de Administrador</label>
-                    <input type="email" id="admin-email" class="form-control" required>
-                </div>
-                <div class="form-group">
-                    <label>Contraseña</label>
-                    <input type="password" id="admin-password" class="form-control" required>
-                </div>
-                <button type="submit" class="btn-primary btn-full" id="btn-admin-login">Acceder al Sistema</button>
-            </form>
-        </div>
-    </div>
+// --- 1. LÓGICA DE LOGIN DE ADMIN ---
+const loginSection = document.getElementById('admin-login');
+const adminMain = document.getElementById('admin-main');
+const formLogin = document.getElementById('form-admin-login');
+const loginMsg = document.getElementById('login-msg');
 
-    <!-- APLICACIÓN ADMIN (Oculta por defecto) -->
-    <div id="admin-main">
-        <header class="header-admin" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 5%; background: var(--card-bg); border-bottom: 1px solid var(--border-color);">
-            <div class="logo-container">
-                <div class="logo-text">SENON <span style="font-size:14px; color:var(--primary);">ADMIN</span></div>
-            </div>
-            <div style="display: flex; gap: 15px;">
-                <a href="index.html" class="btn-outline" style="text-decoration:none;">Ver Catálogo</a>
-                <button id="btn-logout" class="btn-outline" style="color: #ef4444; border-color: #ef4444;">Cerrar Sesión</button>
-            </div>
-        </header>
+// IMPORTANTE: Pon aquí el correo exacto que creaste en Firebase Auth
+const ADMIN_EMAIL = "TU_CORREO_AQUI@gmail.com"; 
 
-        <main class="admin-container">
-            <!-- Pestañas -->
-            <div class="admin-tabs">
-                <button class="admin-tab active" data-target="tab-inventario">Inventario y Precios</button>
-                <button class="admin-tab" data-target="tab-clientes">Directorio de Clientes</button>
-            </div>
+formLogin.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('admin-email').value;
+    const pass = document.getElementById('admin-password').value;
+    
+    try {
+        await signInWithEmailAndPassword(auth, email, pass);
+        loginMsg.style.display = 'none';
+    } catch (error) {
+        loginMsg.textContent = "Credenciales incorrectas.";
+        loginMsg.className = "message error";
+    }
+});
 
-            <!-- PESTAÑA: INVENTARIO -->
-            <div id="tab-inventario" class="admin-section active">
-                <div class="admin-grid">
-                    <!-- Formulario Producto -->
-                    <div class="admin-card">
-                        <h2>Nuevo Producto</h2>
-                        <div id="admin-message" class="message" style="margin-bottom:15px;"></div>
-                        <form id="form-product">
-                            <div class="form-group">
-                                <label>Nombre del Producto</label>
-                                <input type="text" id="prod-nombre" class="form-control" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Categoría</label>
-                                <select id="prod-categoria" class="form-control" required>
-                                    <option value="Bioquimica">Bioquímica</option>
-                                    <option value="Hematologia">Hematología</option>
-                                    <option value="Coagulacion">Coagulación</option>
-                                    <option value="Serologia">Serología</option>
-                                    <option value="Miscelaneos">Misceláneos</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Descripción Pública</label>
-                                <textarea id="prod-desc" class="form-control" rows="2" required></textarea>
-                            </div>
-                            
-                            <h3 style="font-size: 16px; margin: 15px 0 10px 0;">Precios (Solo Admin)</h3>
-                            <div class="grid-precios">
-                                <div class="form-group"><label>Precio A (USD)</label><input type="number" step="0.01" id="prod-pA" class="form-control" required></div>
-                                <div class="form-group"><label>Precio B (USD)</label><input type="number" step="0.01" id="prod-pB" class="form-control" required></div>
-                                <div class="form-group"><label>Precio C (USD)</label><input type="number" step="0.01" id="prod-pC" class="form-control" required></div>
-                                <div class="form-group"><label>Precio D (USD)</label><input type="number" step="0.01" id="prod-pD" class="form-control" required></div>
-                            </div>
+onAuthStateChanged(auth, (user) => {
+    if (user && user.email === ADMIN_EMAIL) {
+        loginSection.style.display = 'none';
+        adminMain.style.display = 'block';
+        cargarProductos();
+        cargarClientes();
+    } else {
+        loginSection.style.display = 'flex';
+        adminMain.style.display = 'none';
+    }
+});
 
-                            <button type="submit" class="btn-primary btn-full" id="btn-save" style="margin-top: 15px;">Guardar Producto</button>
-                        </form>
-                    </div>
+document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
 
-                    <!-- Tabla Productos -->
-                    <div class="admin-card" style="overflow-x: auto;">
-                        <h2>Productos en Catálogo</h2>
-                        <table class="table-products">
-                            <thead><tr><th>Producto</th><th>Categoría</th></tr></thead>
-                            <tbody id="table-body"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+// --- 2. LÓGICA DE PESTAÑAS ---
+document.querySelectorAll('.admin-tab').forEach(tab => {
+    tab.addEventListener('click', (e) => {
+        document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+        e.target.classList.add('active');
+        document.getElementById(e.target.dataset.target).classList.add('active');
+    });
+});
 
-            <!-- PESTAÑA: CLIENTES -->
-            <div id="tab-clientes" class="admin-section">
-                <div class="admin-card">
-                    <h2>Laboratorios Registrados</h2>
-                    <table class="table-products">
-                        <thead>
-                            <tr>
-                                <th>Laboratorio</th>
-                                <th>RIF</th>
-                                <th>Contacto</th>
-                                <th>Estado</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="table-clientes"></tbody>
-                    </table>
-                </div>
-            </div>
+// --- 3. GUARDAR PRODUCTO CON PRECIOS ---
+const formProduct = document.getElementById('form-product');
+const adminMessage = document.getElementById('admin-message');
 
-        </main>
-    </div>
+formProduct.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btn-save');
+    btn.textContent = "Guardando...";
+    btn.disabled = true;
 
-    <script type="module" src="js/admin.js"></script>
-</body>
-</html>
+    const nombre = document.getElementById('prod-nombre').value;
+    const categoria = document.getElementById('prod-categoria').value;
+    const desc = document.getElementById('prod-desc').value;
+
+    try {
+        // A. Guardar en la colección pública (sin precios)
+        const docRef = await addDoc(collection(db, "catalogo"), {
+            nombre: nombre,
+            categoria: categoria,
+            descripcion: desc
+        });
+
+        // B. Guardar los precios en la colección privada usando el mismo ID
+        await setDoc(doc(db, "precios", docRef.id), {
+            producto_id: docRef.id,
+            precio_A: parseFloat(document.getElementById('prod-pA').value),
+            precio_B: parseFloat(document.getElementById('prod-pB').value),
+            precio_C: parseFloat(document.getElementById('prod-pC').value),
+            precio_D: parseFloat(document.getElementById('prod-pD').value)
+        });
+
+        adminMessage.textContent = "Producto y precios guardados.";
+        adminMessage.className = "message success";
+        formProduct.reset();
+        cargarProductos();
+        setTimeout(() => adminMessage.className = 'message', 3000);
+
+    } catch (error) {
+        console.error(error);
+        adminMessage.textContent = "Error al guardar.";
+        adminMessage.className = "message error";
+    } finally {
+        btn.textContent = "Guardar Producto";
+        btn.disabled = false;
+    }
+});
+
+// --- 4. CARGAR TABLA PRODUCTOS ---
+async function cargarProductos() {
+    const tbody = document.getElementById('table-body');
+    tbody.innerHTML = '<tr><td>Cargando...</td></tr>';
+    const querySnapshot = await getDocs(collection(db, "catalogo"));
+    tbody.innerHTML = '';
+    querySnapshot.forEach((doc) => {
+        const p = doc.data();
+        tbody.innerHTML += `<tr><td><strong>${p.nombre}</strong></td><td><span class="badge">${p.categoria}</span></td></tr>`;
+    });
+}
+
+// --- 5. CARGAR Y APROBAR CLIENTES ---
+async function cargarClientes() {
+    const tbody = document.getElementById('table-clientes');
+    tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+    
+    try {
+        const querySnapshot = await getDocs(collection(db, "usuarios"));
+        tbody.innerHTML = '';
+        
+        if(querySnapshot.empty) {
+            tbody.innerHTML = '<tr><td colspan="5">No hay clientes registrados.</td></tr>';
+            return;
+        }
+
+        querySnapshot.forEach((docSnap) => {
+            const c = docSnap.data();
+            const isPendiente = c.estado === 'pendiente';
+            const btnAccion = isPendiente 
+                ? `<button class="btn-success" onclick="aprobarCliente('${docSnap.id}')">Aprobar</button>`
+                : `<span style="color:#22c55e; font-weight:bold;">Aprobado</span>`;
+
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${c.nombre_laboratorio}</strong></td>
+                    <td>${c.rif}</td>
+                    <td>${c.nombre_contacto}<br><small>${c.telefono}</small></td>
+                    <td>${isPendiente ? '⏳ Pendiente' : '✅ ' + c.estado}</td>
+                    <td>${btnAccion}</td>
+                </tr>
+            `;
+        });
+    } catch (error) {
+        console.error(error);
+        tbody.innerHTML = '<tr><td colspan="5" style="color:red;">Error al cargar clientes.</td></tr>';
+    }
+}
+
+// Función global para el botón de aprobar
+window.aprobarCliente = async (uid) => {
+    try {
+        const userRef = doc(db, "usuarios", uid);
+        await updateDoc(userRef, { estado: "aprobado" });
+        cargarClientes(); // Recargar tabla
+    } catch (error) {
+        alert("Error al aprobar cliente.");
+    }
+};
