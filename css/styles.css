@@ -1,13 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;600;700&display=swap');
 
 :root {
-  /* Paleta Premium - Modo Claro */
   --bg-body: #f4f7f9;
   --bg-surface: rgba(255, 255, 255, 0.85);
   --card-bg: #ffffff;
   --text-main: #1a1f36;
   --text-muted: #697386;
-  --accent: #ff6b00; /* Naranja Senon */
+  --accent: #ff6b00;
   --accent-hover: #e65c00;
   --border-color: rgba(0, 0, 0, 0.08);
   --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
@@ -16,7 +15,6 @@
 }
 
 body.dark {
-  /* Modo Oscuro */
   --bg-body: #0b0f19;
   --bg-surface: rgba(22, 28, 45, 0.85);
   --card-bg: #1e293b;
@@ -28,7 +26,7 @@ body.dark {
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
-body { background-color: var(--bg-body); color: var(--text-main); transition: background-color 0.3s, color 0.3s; min-height: 100vh; }
+body { background-color: var(--bg-body); color: var(--text-main); transition: background-color 0.3s, color 0.3s; min-height: 100vh; overflow-x: hidden; }
 h1, h2, h3 { font-family: 'Outfit', sans-serif; font-weight: 600; letter-spacing: -0.02em; }
 
 /* --- HEADER PÚBLICO --- */
@@ -48,9 +46,14 @@ h1, h2, h3 { font-family: 'Outfit', sans-serif; font-weight: 600; letter-spacing
 .btn-danger { background: transparent; border: 1px solid #ef4444; color: #ef4444; }
 .btn-danger:hover { background: #ef4444; color: white; }
 
-/* --- DASHBOARD ADMIN (SIDEBAR) --- */
-#app-main { display: flex; width: 100%; min-height: 100vh; }
-.sidebar { width: 260px; background: var(--card-bg); border-right: 1px solid var(--border-color); position: fixed; height: 100vh; display: flex; flex-direction: column; z-index: 1000; transition: 0.3s; }
+/* --- LAYOUT ADMIN --- */
+#app-main { display: flex; width: 100%; min-height: 100vh; position: relative; }
+
+/* SIDEBAR Y OVERLAY */
+.sidebar { width: 260px; background: var(--card-bg); border-right: 1px solid var(--border-color); position: fixed; height: 100vh; display: flex; flex-direction: column; z-index: 1000; transition: transform 0.3s ease; }
+.sidebar-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 999; opacity: 0; visibility: hidden; transition: all 0.3s ease; }
+.sidebar-overlay.active { opacity: 1; visibility: visible; }
+
 .sidebar-header { padding: 30px 20px; text-align: center; border-bottom: 1px solid var(--border-color); }
 .sidebar-header img { max-width: 120px; margin-bottom: 10px; }
 .sidebar-menu { flex: 1; padding: 20px 10px; overflow-y: auto; }
@@ -59,16 +62,19 @@ h1, h2, h3 { font-family: 'Outfit', sans-serif; font-weight: 600; letter-spacing
 .menu-item.active { background: var(--text-main); color: var(--bg-body); }
 .sidebar-footer { padding: 20px; border-top: 1px solid var(--border-color); }
 
-.main-content { margin-left: 260px; width: calc(100% - 260px); padding: 30px; flex: 1; }
-.topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+.main-content { margin-left: 260px; width: calc(100% - 260px); padding: 30px; flex: 1; transition: margin 0.3s ease; }
+.topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; position: relative; z-index: 10; }
 .page-title { font-size: 28px; }
 .tasa-display { background: var(--bg-surface); padding: 8px 16px; border-radius: 30px; border: 1px solid var(--border-color); font-weight: 600; color: var(--accent); font-size: 14px; box-shadow: var(--shadow-sm); }
 
+/* BOTÓN HAMBURGUESA */
+.menu-toggle { display: none; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; font-size: 24px; cursor: pointer; color: var(--text-main); padding: 5px 12px; z-index: 1001; position: relative; }
+
 /* --- COMPONENTES (CARDS Y TABLAS) --- */
 .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow-sm); margin-bottom: 24px; }
-.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); flex-wrap: wrap; gap: 10px; }
 .table-responsive { overflow-x: auto; }
-.table-pro { width: 100%; border-collapse: collapse; }
+.table-pro { width: 100%; border-collapse: collapse; min-width: 600px; }
 .table-pro th { text-align: left; padding: 12px 15px; font-size: 12px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 0.5px; }
 .table-pro td { padding: 15px; border-bottom: 1px solid var(--border-color); font-size: 14px; transition: background 0.2s; }
 .table-pro tr:hover td { background: rgba(0,0,0,0.02); }
@@ -89,49 +95,30 @@ body.dark .table-pro tr:hover td { background: rgba(255,255,255,0.02); }
 .close-modal { position: absolute; top: 20px; right: 20px; background: none; border: none; font-size: 24px; color: var(--text-muted); cursor: pointer; }
 .close-modal:hover { color: var(--accent); }
 
-/* --- CORRECCIÓN DEL BUSCADOR (FONDO SÓLIDO) --- */
-.search-results { 
-    position: absolute; 
-    background-color: var(--card-bg) !important; /* Fondo sólido */
-    border: 1px solid var(--border-color); 
-    border-radius: 8px; 
-    max-height: 250px; 
-    overflow-y: auto; 
-    z-index: 9999; 
-    width: 100%; 
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important; 
-    display: none; 
-    margin-top: 5px; 
-}
-.search-item { 
-    padding: 12px 15px; 
-    border-bottom: 1px solid var(--border-color); 
-    cursor: pointer; 
-    font-size: 14px; 
-    color: var(--text-main); 
-    transition: background 0.2s; 
-}
-.search-item:hover { 
-    background-color: var(--bg-body) !important; 
-}
+/* --- BUSCADOR --- */
+.search-results { position: absolute; background-color: var(--card-bg) !important; border: 1px solid var(--border-color); border-radius: 8px; max-height: 250px; overflow-y: auto; z-index: 9999; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important; display: none; margin-top: 5px; }
+.search-item { padding: 12px 15px; border-bottom: 1px solid var(--border-color); cursor: pointer; font-size: 14px; color: var(--text-main); transition: background 0.2s; }
+.search-item:hover { background-color: var(--bg-body) !important; }
 .search-item:last-child { border-bottom: none; }
 .btn-nuevo-producto { color: var(--accent) !important; font-weight: 600; }
 
-/* Grid layouts y utilidades */
+/* Grid layouts */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
 .w-100 { width: 100%; }
-.menu-toggle { display: none; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-main); }
 
-@media (max-width: 900px) {
+/* --- RESPONSIVE (TELÉFONOS Y TABLETS) --- */
+@media (max-width: 1024px) {
   .sidebar { transform: translateX(-100%); }
-  .sidebar.open { transform: translateX(0); }
-  .main-content { margin-left: 0; width: 100%; }
+  .sidebar.open { transform: translateX(0); box-shadow: 4px 0 15px rgba(0,0,0,0.15); }
+  .main-content { margin-left: 0; width: 100%; padding: 20px 15px; }
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
   .menu-toggle { display: block; }
+  .page-title { font-size: 20px; }
+  .tasa-display { font-size: 12px; padding: 6px 12px; }
 }
 
-/* --- LOGIN SPLIT --- */
+/* --- LOGIN --- */
 .login-split-container { display: flex; min-height: 100vh; width: 100%; background: var(--card-bg); }
 .login-left { flex: 1.2; background: linear-gradient(135deg, #0a0f1c 0%, #1a2b4c 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; padding: 40px; color: white; text-align: center; }
 .login-left-content { position: relative; z-index: 2; }
