@@ -11,6 +11,7 @@ let COTIZACION_WEB_ACTUAL = null;
 let MANUAL_ITEMS = [];
 let COMPRA_ITEMS = [];
 let chartInstance = null;
+let TOTAL_GASTOS = 0;
 
 // --- LOGIN Y NAVEGACIÓN ---
 document.getElementById('form-admin-login').addEventListener('submit', async (e) => {
@@ -59,7 +60,7 @@ async function initApp() {
     cargarVentas();
     cargarServicios();
     cargarCuentas();
-    cargarGrafica();
+    cargarGastosYGrafica();
 }
 
 // --- 1. INVENTARIO ---
@@ -148,51 +149,45 @@ document.getElementById('form-producto').addEventListener('submit', async (e) =>
     cargarInventario();
 });
 
-// EXPORTAR LISTAS DE PRECIOS AGRUPADAS
+// EXPORTAR LISTAS DE PRECIOS
 window.exportarListaPrecios = (nivel, titulo) => {
     const { jsPDF } = window.jspdf; const doc = new jsPDF();
     
-    // Encabezado
+    // MEMBRETE ALINEADO
     doc.addImage('img/logo.png', 'PNG', 14, 10, 40, 15);
-    doc.setFontSize(10); doc.setTextColor(100);
-    doc.text("R.I.F: J-50719484-1 | Telf: 0414-3549096", 150, 15);
+    doc.setFontSize(9); doc.setTextColor(80);
+    doc.text("R.I.F: J-50719484-1 | Telf: 0414-3549096", 196, 15, { align: "right" });
+    doc.text("Calle Caracas, Angostura del Orinoco, Ciudad Bolívar", 196, 20, { align: "right" });
+    
     doc.setFontSize(16); doc.setTextColor(0);
-    doc.text(`LISTA DE PRECIOS - ${titulo}`, 14, 35);
-    doc.setFontSize(9); doc.text(`Fecha: ${new Date().toLocaleDateString()}  |  Tasa: Bs. ${TASA_BCV.toFixed(2)}`, 14, 42);
+    doc.text(`LISTA DE PRECIOS - ${titulo}`, 14, 40);
+    doc.setFontSize(9); doc.text(`Fecha: ${new Date().toLocaleDateString()} | Tasa: Bs. ${TASA_BCV.toFixed(2)}`, 14, 47);
 
-    // Agrupar por categoría
     const agrupados = {};
     Object.values(PRODUCTOS_CACHE).forEach(p => {
         if(!agrupados[p.categoria]) agrupados[p.categoria] = [];
         agrupados[p.categoria].push(p);
     });
 
-    let currentY = 50;
+    let currentY = 55;
     Object.keys(agrupados).sort().forEach(cat => {
         doc.setFontSize(11); doc.setFont("helvetica", "bold");
         doc.text(cat.toUpperCase(), 14, currentY);
         
-        const filas = agrupados[cat].map(p => [
-            p.codigo || '-', p.nombre, `$${p[nivel].toFixed(2)}`, `Bs. ${(p[nivel] * TASA_BCV).toFixed(2)}`
-        ]);
+        const filas = agrupados[cat].map(p => [ p.codigo || '-', p.nombre, `$${p[nivel].toFixed(2)}`, `Bs. ${(p[nivel] * TASA_BCV).toFixed(2)}` ]);
 
         doc.autoTable({
-            startY: currentY + 5,
-            head: [["Código", "Producto", "Precio USD", "Precio Bs."]],
-            body: filas,
-            theme: 'striped',
-            headStyles: { fillColor: [26, 43, 76] },
-            styles: { fontSize: 8 },
+            startY: currentY + 5, head: [["Código", "Producto", "Precio USD", "Precio Bs."]],
+            body: filas, theme: 'striped', headStyles: { fillColor: [26, 43, 76] }, styles: { fontSize: 8 },
             margin: { left: 14, right: 14 }
         });
         currentY = doc.lastAutoTable.finalY + 15;
         if (currentY > 260) { doc.addPage(); currentY = 20; }
     });
-
     doc.save(`Lista_Precios_${nivel}.pdf`);
 };
 
-// --- 2. COTIZACIONES (CON DESCUENTO DE STOCK) ---
+// --- 2. COTIZACIONES Y BUSCADORES (FUNCIONES GLOBALES) ---
 async function cargarCotizaciones() {
     const tbody = document.getElementById('tbody-cotizaciones');
     const snap = await getDocs(collection(db, "cotizaciones"));
@@ -218,29 +213,19 @@ window.abrirCotizar = (id, str) => {
 window.guardarCotizacionWeb = async () => {
     const nivel = document.getElementById('cotizar-nivel').value;
     let total = 0; let prods = [];
-    
     for (let p of COTIZACION_WEB_ACTUAL.productos) {
         const pr = PRODUCTOS_CACHE[p.id]; 
-        let precioU = pr ? pr[nivel] : 0;
-        total += precioU * p.cantidad;
+        let precioU = pr ? pr[nivel] : 0; total += precioU * p.cantidad;
         prods.push({ ...p, precio_unitario: precioU, subtotal: precioU * p.cantidad, codigo: pr ? pr.codigo : 'N/A', exento: pr ? pr.exento : false });
-        
-        // DESCONTAR STOCK AUTOMÁTICAMENTE
-        if (pr) {
-            const nuevoStock = Math.max(0, (pr.stock || 0) - p.cantidad);
-            await updateDoc(doc(db, "catalogo", p.id), { stock: nuevoStock });
-        }
+        if (pr) { const nuevoStock = Math.max(0, (pr.stock || 0) - p.cantidad); await updateDoc(doc(db, "catalogo", p.id), { stock: nuevoStock }); }
     }
-    
     await updateDoc(doc(db, "cotizaciones", COTIZACION_WEB_ACTUAL.id), { estado: "aprobada", total_usd: total, productos_con_precio: prods });
     await addDoc(collection(db, "cxc"), { cliente_email: COTIZACION_WEB_ACTUAL.email, monto: total, estado: "pendiente", fecha: new Date() });
-    
     document.getElementById('modal-cotizar').classList.remove('active');
-    cargarCotizaciones(); cargarVentas(); cargarCuentas(); cargarGrafica(); cargarInventario();
-    Swal.fire('Aprobada', 'Stock descontado correctamente', 'success');
+    cargarCotizaciones(); cargarVentas(); cargarCuentas(); cargarGastosYGrafica(); cargarInventario();
+    Swal.fire('Aprobada', 'Stock descontado', 'success');
 };
 
-// --- COTIZACIÓN MANUAL ---
 window.abrirModalCotizacionManual = () => {
     const select = document.getElementById('manual-cot-cliente');
     select.innerHTML = '<option value="">Seleccione un cliente...</option>';
@@ -257,15 +242,21 @@ window.cambiarNivelCliente = () => {
     }
 };
 
-document.getElementById('manual-buscar').addEventListener('input', (e) => {
-    const q = e.target.value.toLowerCase(); const resDiv = document.getElementById('res-manual');
-    if (q.length < 2) { resDiv.style.display = 'none'; return; }
+// ESTA FUNCION SE LLAMA DIRECTO DESDE EL HTML
+window.buscarProductoManual = (query) => {
+    const q = query.toLowerCase(); const resDiv = document.getElementById('res-manual');
+    if (q.length < 1) { resDiv.style.display = 'none'; return; }
+    // Si por alguna razon el cache esta vacio, avisamos
+    if (Object.keys(PRODUCTOS_CACHE).length === 0) {
+        resDiv.innerHTML = '<div class="search-item" style="color:red;">Cargando inventario, espere 2 segundos...</div>';
+        resDiv.style.display = 'block'; return;
+    }
     const matches = Object.values(PRODUCTOS_CACHE).filter(p => p.nombre.toLowerCase().includes(q) || (p.codigo && p.codigo.toLowerCase().includes(q))).slice(0, 5);
     if (matches.length > 0) {
-        resDiv.innerHTML = matches.map(p => `<div style="padding:10px; border-bottom:1px solid var(--border); cursor:pointer;" onclick="agregarManual('${p.id}')"><strong>${p.nombre}</strong> - $${p.precio_A}</div>`).join('');
+        resDiv.innerHTML = matches.map(p => `<div class="search-item" onclick="agregarManual('${p.id}')"><strong>${p.nombre}</strong> - $${p.precio_A}</div>`).join('');
         resDiv.style.display = 'block';
-    } else { resDiv.innerHTML = '<div style="padding:10px;">No encontrado</div>'; resDiv.style.display = 'block'; }
-});
+    } else { resDiv.innerHTML = '<div class="search-item">No encontrado</div>'; resDiv.style.display = 'block'; }
+};
 
 window.agregarManual = (id) => {
     const p = PRODUCTOS_CACHE[id]; MANUAL_ITEMS.push({ id, nombre: p.nombre, codigo: p.codigo, cantidad: 1, precio_A: p.precio_A, precio_B: p.precio_B, precio_C: p.precio_C, precio_D: p.precio_D, exento: p.exento, stock: p.stock });
@@ -297,24 +288,20 @@ window.guardarCotizacionManual = async () => {
         prods.push({ id: item.id, nombre: item.nombre, codigo: item.codigo, cantidad: item.cantidad, precio_unitario: precioU, subtotal: precioU * item.cantidad, exento: item.exento });
     });
     
-    // Restar Stock
     for (let item of MANUAL_ITEMS) {
         const p = PRODUCTOS_CACHE[item.id];
-        if(p) {
-            const nuevoStock = Math.max(0, (p.stock || 0) - item.cantidad);
-            await updateDoc(doc(db, "catalogo", item.id), { stock: nuevoStock });
-        }
+        if(p) { const nuevoStock = Math.max(0, (p.stock || 0) - item.cantidad); await updateDoc(doc(db, "catalogo", item.id), { stock: nuevoStock }); }
     }
 
     await addDoc(collection(db, "cotizaciones"), { cliente_id: clienteId, email: cliente.email, estado: "aprobada", total_usd: total, productos_con_precio: prods, fecha: new Date(), es_manual: true });
     await addDoc(collection(db, "cxc"), { cliente_email: cliente.email, monto: total, estado: "pendiente", fecha: new Date() });
     
     document.getElementById('modal-cotizacion-manual').classList.remove('active');
-    cargarCotizaciones(); cargarVentas(); cargarCuentas(); cargarGrafica(); cargarInventario();
-    Swal.fire('¡Éxito!', 'Cotización manual creada y stock descontado', 'success');
+    cargarCotizaciones(); cargarVentas(); cargarCuentas(); cargarGastosYGrafica(); cargarInventario();
+    Swal.fire('¡Éxito!', 'Cotización creada', 'success');
 };
 
-// --- 3. VENTAS Y PDFs (CON DISEÑO Y MEMBRETE) ---
+// --- 3. VENTAS Y PDFs ---
 async function cargarVentas() {
     const tbody = document.getElementById('tbody-ventas'); const snap = await getDocs(collection(db, "cotizaciones"));
     tbody.innerHTML = ''; let tot = 0;
@@ -332,20 +319,18 @@ window.generarPDF = (str, tipo) => {
     const c = JSON.parse(decodeURIComponent(str));
     const { jsPDF } = window.jspdf; const doc = new jsPDF();
     
-    // Encabezado Empresa
+    // MEMBRETE
     doc.addImage('img/logo.png', 'PNG', 14, 10, 35, 15);
-    doc.setFontSize(10); doc.setTextColor(80);
-    doc.text("Calle Caracas cruce con callejón sin nombre, Edif. Primer Piso, Of. 1", 14, 30);
-    doc.text("Barrio El Merecure, Angostura del Orinoco, Ciudad Bolívar", 14, 35);
-    doc.text("R.I.F: J-50719484-1 | Telf: 0414-3549096", 14, 40);
+    doc.setFontSize(9); doc.setTextColor(80);
+    doc.text("R.I.F: J-50719484-1 | Telf: 0414-3549096", 196, 15, { align: "right" });
+    doc.text("Calle Caracas, Angostura del Orinoco, Ciudad Bolívar", 196, 20, { align: "right" });
     
     doc.setFontSize(16); doc.setTextColor(0);
-    doc.text(tipo, 14, 55);
+    doc.text(tipo, 14, 40);
     
-    // Datos Cliente
     doc.setFontSize(10); doc.setFont("helvetica", "normal");
-    doc.text(`CLIENTE: ${c.email.split('@')[0].toUpperCase()}`, 14, 65);
-    doc.text(`FECHA: ${new Date().toLocaleDateString()}`, 150, 65);
+    doc.text(`CLIENTE: ${c.email.split('@')[0].toUpperCase()}`, 14, 50);
+    doc.text(`FECHA: ${new Date().toLocaleDateString()}`, 150, 50);
     
     let base = 0; let exento = 0;
     const filas = c.productos_con_precio.map(p => {
@@ -353,21 +338,12 @@ window.generarPDF = (str, tipo) => {
         return [p.cantidad, p.nombre, p.codigo || '-', `$${p.precio_unitario.toFixed(2)}`, `$${p.subtotal.toFixed(2)}`];
     });
 
-    doc.autoTable({
-        startY: 75,
-        head: [["CANT.", "DESCRIPCIÓN", "SKU", "PRECIO USD", "TOTAL USD"]],
-        body: filas,
-        theme: 'grid',
-        headStyles: { fillColor: [26, 43, 76], textColor: [255,255,255] },
-        styles: { fontSize: 9 }
-    });
+    doc.autoTable({ startY: 60, head: [["CANT.", "DESCRIPCIÓN", "SKU", "PRECIO USD", "TOTAL USD"]], body: filas, theme: 'grid', headStyles: { fillColor: [26, 43, 76], textColor: [255,255,255] }, styles: { fontSize: 9 } });
 
-    let y = doc.lastAutoTable.finalY + 10;
-    doc.setFont("helvetica", "bold");
+    let y = doc.lastAutoTable.finalY + 10; doc.setFont("helvetica", "bold");
     
     if(tipo === 'FACTURA') {
-        const iva = base * 0.16;
-        const totalFactura = base + exento + iva;
+        const iva = base * 0.16; const totalFactura = base + exento + iva;
         doc.text(`Base Imponible: $${base.toFixed(2)}`, 130, y);
         doc.text(`Monto Exento: $${exento.toFixed(2)}`, 130, y+6);
         doc.text(`IVA (16%): $${iva.toFixed(2)}`, 130, y+12);
@@ -376,17 +352,12 @@ window.generarPDF = (str, tipo) => {
         doc.text(`TOTAL Bs: Bs. ${(totalFactura * TASA_BCV).toFixed(2)}`, 130, y+28);
     } else {
         doc.text(`SUBTOTAL USD: $${c.total_usd.toFixed(2)}`, 130, y);
-        doc.setFontSize(12);
-        doc.text(`TOTAL Bs: Bs. ${(c.total_usd * TASA_BCV).toFixed(2)}`, 130, y+8);
+        doc.setFontSize(12); doc.text(`TOTAL Bs: Bs. ${(c.total_usd * TASA_BCV).toFixed(2)}`, 130, y+8);
     }
-
-    doc.setFontSize(9); doc.setTextColor(150);
-    doc.text("Observaciones: Esta cotización tiene una validez de 15 días.", 14, y + 40);
-    
     doc.save(`${tipo}_${c.email.split('@')[0]}.pdf`);
 };
 
-// --- 4. PROVEEDORES Y COMPRAS ---
+// --- 4. PROVEEDORES, COMPRAS Y CLIENTES ---
 async function cargarClientesYProveedores() {
     const snapC = await getDocs(collection(db, "usuarios"));
     const tbodyC = document.getElementById('tbody-clientes'); tbodyC.innerHTML = ''; CLIENTES_CACHE = {};
@@ -412,16 +383,12 @@ document.getElementById('form-cliente-manual').addEventListener('submit', async 
     e.preventDefault();
     await addDoc(collection(db, "usuarios"), {
         nombre_laboratorio: document.getElementById('cli-lab').value || 'Sin Nombre', 
-        rif: document.getElementById('cli-rif').value,
-        nombre_contacto: document.getElementById('cli-contacto').value, 
-        direccion: document.getElementById('cli-direccion').value,
-        email: document.getElementById('cli-email').value, 
-        nivel_precio: document.getElementById('cli-nivel').value,
-        estado: 'aprobado'
+        rif: document.getElementById('cli-rif').value, nombre_contacto: document.getElementById('cli-contacto').value, 
+        direccion: document.getElementById('cli-direccion').value, email: document.getElementById('cli-email').value, 
+        nivel_precio: document.getElementById('cli-nivel').value, estado: 'aprobado'
     });
     document.getElementById('modal-cliente').classList.remove('active');
-    document.getElementById('form-cliente-manual').reset();
-    cargarClientesYProveedores();
+    document.getElementById('form-cliente-manual').reset(); cargarClientesYProveedores();
 });
 
 document.getElementById('form-proveedor').addEventListener('submit', async (e) => {
@@ -430,15 +397,20 @@ document.getElementById('form-proveedor').addEventListener('submit', async (e) =
     document.getElementById('form-proveedor').reset(); cargarClientesYProveedores();
 });
 
-document.getElementById('compra-buscar-prod').addEventListener('input', (e) => {
-    const q = e.target.value.toLowerCase(); const resDiv = document.getElementById('res-compra');
-    if (q.length < 2) { resDiv.style.display = 'none'; return; }
+// FUNCION DE COMPRAS DIRECTA DESDE EL HTML
+window.buscarProductoCompra = (query) => {
+    const q = query.toLowerCase(); const resDiv = document.getElementById('res-compra');
+    if (q.length < 1) { resDiv.style.display = 'none'; return; }
+    if (Object.keys(PRODUCTOS_CACHE).length === 0) {
+        resDiv.innerHTML = '<div class="search-item" style="color:red;">Cargando...</div>';
+        resDiv.style.display = 'block'; return;
+    }
     const matches = Object.values(PRODUCTOS_CACHE).filter(p => p.nombre.toLowerCase().includes(q) || (p.codigo && p.codigo.toLowerCase().includes(q))).slice(0, 5);
     if (matches.length > 0) {
-        resDiv.innerHTML = matches.map(p => `<div style="padding:10px; border-bottom:1px solid var(--border); cursor:pointer;" onclick="agregarCompra('${p.id}')"><strong>${p.nombre}</strong> - Costo: $${p.costo}</div>`).join('');
+        resDiv.innerHTML = matches.map(p => `<div class="search-item" onclick="agregarCompra('${p.id}')"><strong>${p.nombre}</strong> - Costo: $${p.costo}</div>`).join('');
         resDiv.style.display = 'block';
-    } else { resDiv.innerHTML = '<div style="padding:10px;">No encontrado</div>'; resDiv.style.display = 'block'; }
-});
+    } else { resDiv.innerHTML = '<div class="search-item">No encontrado</div>'; resDiv.style.display = 'block'; }
+};
 
 window.agregarCompra = (id) => {
     const p = PRODUCTOS_CACHE[id]; COMPRA_ITEMS.push({ id, nombre: p.nombre, costo: p.costo, cantidad: 1 });
@@ -465,25 +437,29 @@ document.getElementById('form-compra').addEventListener('submit', async (e) => {
     await addDoc(collection(db, "compras"), { proveedor_id: document.getElementById('compra-proveedor').value, items: COMPRA_ITEMS, monto: total, pagada, conIva, fecha: new Date() });
     if (!pagada) await addDoc(collection(db, "cxp"), { proveedor_id: document.getElementById('compra-proveedor').value, monto: total, estado: "pendiente", fecha: new Date() });
     
-    // Sumar stock
     for (let item of COMPRA_ITEMS) {
         const p = PRODUCTOS_CACHE[item.id];
-        if(p) {
-            const nuevoStock = (p.stock || 0) + item.cantidad;
-            await updateDoc(doc(db, "catalogo", item.id), { stock: nuevoStock });
-        }
+        if(p) { const nuevoStock = (p.stock || 0) + item.cantidad; await updateDoc(doc(db, "catalogo", item.id), { stock: nuevoStock }); }
     }
 
     COMPRA_ITEMS = []; document.getElementById('form-compra').reset(); renderCompraItems(); cargarCuentas(); cargarInventario();
-    Swal.fire({ title: '¡Compra Registrada!', text: 'Stock sumado correctamente.', icon: 'success', timer: 2000, showConfirmButton: false });
+    Swal.fire({ title: '¡Compra Registrada!', text: 'Stock sumado.', icon: 'success', timer: 2000, showConfirmButton: false });
 });
 
-// --- 5. SERVICIO TÉCNICO ---
+// --- 5. SERVICIO TÉCNICO CON PDF EDITABLE ---
 document.getElementById('form-reparacion-manual').addEventListener('submit', async (e) => {
     e.preventDefault();
-    await addDoc(collection(db, "tickets_servicio"), { cliente: document.getElementById('rep-cliente').value, equipo: document.getElementById('rep-equipo').value, falla: document.getElementById('rep-falla').value, estado: "Recibido", fecha: new Date() });
-    document.getElementById('modal-reparacion').classList.remove('active'); document.getElementById('form-reparacion-manual').reset(); cargarServicios();
-    Swal.fire('Registrado', 'Ticket de servicio creado', 'success');
+    await addDoc(collection(db, "tickets_servicio"), { 
+        cliente: document.getElementById('rep-cliente').value, 
+        equipo: document.getElementById('rep-equipo').value, 
+        falla: document.getElementById('rep-falla').value, 
+        actividades: document.getElementById('rep-actividades').value,
+        observaciones: document.getElementById('rep-observaciones').value,
+        estado: "Recibido", fecha: new Date() 
+    });
+    document.getElementById('modal-reparacion').classList.remove('active'); 
+    document.getElementById('form-reparacion-manual').reset(); cargarServicios();
+    Swal.fire('Registrado', 'Ticket creado', 'success');
 });
 
 async function cargarServicios() {
@@ -498,25 +474,34 @@ window.generarInformeTecnico = (str) => {
     const t = JSON.parse(decodeURIComponent(str));
     const { jsPDF } = window.jspdf; const doc = new jsPDF();
     
-    // Encabezado
     doc.addImage('img/logo.png', 'PNG', 14, 10, 35, 15);
-    doc.setFontSize(10); doc.setTextColor(80);
-    doc.text("R.I.F: J-50719484-1 | Telf: 0414-3549096", 14, 30);
-    doc.text("Angostura del Orinoco, Ciudad Bolívar", 14, 35);
+    doc.setFontSize(9); doc.setTextColor(80);
+    doc.text("R.I.F: J-50719484-1 | Telf: 0414-3549096", 196, 15, { align: "right" });
+    doc.text("Calle Caracas, Angostura del Orinoco, Ciudad Bolívar", 196, 20, { align: "right" });
 
     doc.setFontSize(16); doc.setTextColor(0);
-    doc.text("INFORME DE SERVICIO TÉCNICO", 14, 50);
+    doc.text("INFORME DE SERVICIO TÉCNICO", 14, 40);
     
-    doc.setFontSize(10);
-    doc.text(`Cliente: ${t.cliente}`, 14, 65); 
-    doc.text(`Equipo: ${t.equipo}`, 14, 75);
-    doc.text(`Falla Reportada:`, 14, 85); 
-    doc.text(t.falla, 14, 91, { maxWidth: 180 });
+    doc.setFontSize(10); doc.text(`Cliente: ${t.cliente}`, 14, 55); 
+    doc.text(`Equipo: ${t.equipo}`, 14, 65);
     
-    doc.save("Informe_Tecnico.pdf");
+    doc.setFont("helvetica", "bold"); doc.text(`Falla Reportada:`, 14, 75); 
+    doc.setFont("helvetica", "normal"); doc.text(t.falla, 14, 81, { maxWidth: 180 });
+
+    if(t.actividades) {
+        doc.setFont("helvetica", "bold"); doc.text(`Actividades Realizadas:`, 14, 95);
+        doc.setFont("helvetica", "normal"); doc.text(t.actividades, 14, 101, { maxWidth: 180 });
+    }
+
+    if(t.observaciones) {
+        doc.setFont("helvetica", "bold"); doc.text(`Observaciones:`, 14, 120);
+        doc.setFont("helvetica", "normal"); doc.text(t.observaciones, 14, 126, { maxWidth: 180 });
+    }
+    
+    doc.save(`Informe_${t.cliente.replace(/ /g, '_')}.pdf`);
 };
 
-// --- 6. CUENTAS Y GRÁFICAS ---
+// --- 6. CUENTAS Y GASTOS ---
 async function cargarCuentas() {
     const cxc = await getDocs(collection(db, "cxc")); const tCxc = document.getElementById('tbody-cxc'); tCxc.innerHTML = '';
     let totalCobrar = 0;
@@ -545,15 +530,42 @@ window.saldarCuenta = async (id, tipo) => {
     Swal.fire('¡Saldado!', 'La cuenta ha sido marcada como pagada.', 'success');
 };
 
-async function cargarGrafica() {
+// GASTOS Y GRAFICA
+document.getElementById('form-gasto').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await addDoc(collection(db, "gastos"), { 
+        descripcion: document.getElementById('gasto-desc').value, 
+        monto: parseFloat(document.getElementById('gasto-monto').value), 
+        fecha: new Date() 
+    });
+    document.getElementById('form-gasto').reset();
+    Swal.fire({ title: 'Gasto Registrado', icon: 'success', timer: 1500, showConfirmButton: false });
+    cargarGastosYGrafica();
+});
+
+async function cargarGastosYGrafica() {
+    // 1. Sumar gastos
+    const gastosSnap = await getDocs(collection(db, "gastos"));
+    TOTAL_GASTOS = 0;
+    gastosSnap.forEach(d => TOTAL_GASTOS += d.data().monto);
+
+    // 2. Sacar datos de ventas
     const snap = await getDocs(collection(db, "cotizaciones"));
-    let ventas = [0,0,0,0,0,0,0];
+    let ventasSemana = [0,0,0,0,0,0,0];
+    let totalVentas = 0;
+    
     snap.forEach(d => {
-        if(d.data().estado === 'aprobada') {
+        if(d.data().estado === 'aprobada' || d.data().estado === 'facturada') {
             const dia = new Date(d.data().fecha.seconds * 1000).getDay(); 
-            ventas[dia] += d.data().total_usd;
+            ventasSemana[dia] += d.data().total_usd;
+            totalVentas += d.data().total_usd;
         }
     });
+
+    // 3. Actualizar Dashboard
+    if(document.getElementById('dash-ganancia')) {
+        document.getElementById('dash-ganancia').textContent = `$${(totalVentas - TOTAL_GASTOS).toFixed(2)}`;
+    }
 
     const ctx = document.getElementById('chart-dashboard').getContext('2d');
     if(chartInstance) chartInstance.destroy();
@@ -561,7 +573,7 @@ async function cargarGrafica() {
         type: 'line',
         data: {
             labels: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
-            datasets: [{ label: 'Ventas (USD)', data: ventas, borderColor: '#ff6b00', backgroundColor: 'rgba(255, 107, 0, 0.1)', fill: true, tension: 0.4 }]
+            datasets: [{ label: 'Ventas (USD)', data: ventasSemana, borderColor: '#ff6b00', backgroundColor: 'rgba(255, 107, 0, 0.1)', fill: true, tension: 0.4 }]
         },
         options: { responsive: true }
     });
