@@ -8,37 +8,57 @@
 </head>
 <body>
 
-    <!-- PANTALLA DE LOGIN (Bloquea todo hasta iniciar sesión) -->
-    <div id="admin-login" class="auth-container" style="display: flex; height: 100vh; max-width: 100%; background: var(--bg-color);">
-        <div class="auth-card">
-            <div class="logo-container" style="text-align: center; margin-bottom: 20px;">
-                <div class="logo-text">SENON</div>
-                <div class="logo-subtext">PANEL DE ADMINISTRACIÓN</div>
+    <!-- PANTALLA DE LOGIN (DISEÑO SPLIT) -->
+    <div id="admin-login" class="login-split-container">
+        
+        <!-- Lado Izquierdo (Marca) -->
+        <div class="login-left">
+            <div class="login-left-content">
+                <div class="brand-logo-large">SENON</div>
+                <div class="brand-subtext-large">INDUSTRIAS</div>
+                <p class="brand-slogan">Inventario, ventas y servicio técnico de laboratorio, en un solo sistema.</p>
             </div>
-            <div id="login-msg" class="message"></div>
-            <form id="form-admin-login">
-                <div class="form-group">
-                    <label>Correo de Administrador</label>
-                    <input type="email" id="admin-email" class="form-control" required>
-                </div>
-                <div class="form-group">
-                    <label>Contraseña</label>
-                    <input type="password" id="admin-password" class="form-control" required>
-                </div>
-                <button type="submit" class="btn-primary btn-full" id="btn-admin-login">Acceder al Sistema</button>
-            </form>
+            <div class="login-footer-left">
+                Senon Industrias · RIF J-50719484-1
+            </div>
+        </div>
+
+        <!-- Lado Derecho (Formulario) -->
+        <div class="login-right">
+            <div class="login-form-box">
+                <h1 class="login-title">INICIAR SESIÓN</h1>
+                <p class="login-subtitle">Ingresa con el usuario asignado por la administración.</p>
+                
+                <div id="login-msg" class="message"></div>
+                
+                <form id="form-admin-login">
+                    <div class="form-group">
+                        <label>USUARIO (CORREO)</label>
+                        <input type="email" id="admin-email" class="form-control" placeholder="admin@senon.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>CONTRASEÑA</label>
+                        <input type="password" id="admin-password" class="form-control" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn-entrar" id="btn-admin-login">
+                        ENTRAR 
+                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 
     <!-- APLICACIÓN ADMIN (Oculta por defecto) -->
-    <div id="admin-main">
-        <header class="header-admin" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 5%; background: var(--card-bg); border-bottom: 1px solid var(--border-color);">
+    <div id="admin-main" style="display: none;">
+        
+        <header class="admin-header">
             <div class="logo-container">
-                <div class="logo-text">SENON <span style="font-size:14px; color:var(--primary);">ADMIN</span></div>
+                <div class="logo-text">SENON <span style="font-size:14px; color:var(--primary); background:var(--input-bg); padding:4px 8px; border-radius:4px;">ADMIN</span></div>
             </div>
-            <div style="display: flex; gap: 15px;">
-                <a href="index.html" class="btn-outline" style="text-decoration:none;">Ver Catálogo</a>
-                <button id="btn-logout" class="btn-outline" style="color: #ef4444; border-color: #ef4444;">Cerrar Sesión</button>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <a href="index.html" class="btn-outline" target="_blank">Ver Catálogo</a>
+                <button id="btn-logout" class="btn-danger">Cerrar Sesión</button>
             </div>
         </header>
 
@@ -51,15 +71,16 @@
 
             <!-- PESTAÑA: INVENTARIO -->
             <div id="tab-inventario" class="admin-section active">
-                <div class="admin-grid">
-                    <!-- Formulario Producto -->
-                    <div class="admin-card">
-                        <h2>Nuevo Producto</h2>
-                        <div id="admin-message" class="message" style="margin-bottom:15px;"></div>
+                <div class="grid-layout">
+                    
+                    <!-- Formulario -->
+                    <div class="card">
+                        <h2>Añadir Nuevo Producto</h2>
+                        <div id="admin-message" class="message"></div>
                         <form id="form-product">
                             <div class="form-group">
                                 <label>Nombre del Producto</label>
-                                <input type="text" id="prod-nombre" class="form-control" required>
+                                <input type="text" id="prod-nombre" class="form-control" placeholder="Ej. Glucosa Oxidasa" required>
                             </div>
                             <div class="form-group">
                                 <label>Categoría</label>
@@ -73,48 +94,54 @@
                             </div>
                             <div class="form-group">
                                 <label>Descripción Pública</label>
-                                <textarea id="prod-desc" class="form-control" rows="2" required></textarea>
+                                <textarea id="prod-desc" class="form-control" rows="3" placeholder="Breve descripción del reactivo..." required></textarea>
                             </div>
                             
-                            <h3 style="font-size: 16px; margin: 15px 0 10px 0;">Precios (Solo Admin)</h3>
-                            <div class="grid-precios">
-                                <div class="form-group"><label>Precio A (USD)</label><input type="number" step="0.01" id="prod-pA" class="form-control" required></div>
-                                <div class="form-group"><label>Precio B (USD)</label><input type="number" step="0.01" id="prod-pB" class="form-control" required></div>
-                                <div class="form-group"><label>Precio C (USD)</label><input type="number" step="0.01" id="prod-pC" class="form-control" required></div>
-                                <div class="form-group"><label>Precio D (USD)</label><input type="number" step="0.01" id="prod-pD" class="form-control" required></div>
+                            <div class="form-group">
+                                <label style="color: var(--primary);">Precios (Confidencial)</label>
+                                <div class="grid-precios">
+                                    <div><label>A (USD)</label><input type="number" step="0.01" id="prod-pA" class="form-control" required></div>
+                                    <div><label>B (USD)</label><input type="number" step="0.01" id="prod-pB" class="form-control" required></div>
+                                    <div><label>C (USD)</label><input type="number" step="0.01" id="prod-pC" class="form-control" required></div>
+                                    <div><label>D (USD)</label><input type="number" step="0.01" id="prod-pD" class="form-control" required></div>
+                                </div>
                             </div>
 
-                            <button type="submit" class="btn-primary btn-full" id="btn-save" style="margin-top: 15px;">Guardar Producto</button>
+                            <button type="submit" class="btn-primary btn-full" id="btn-save" style="margin-top: 10px;">Guardar en Base de Datos</button>
                         </form>
                     </div>
 
-                    <!-- Tabla Productos -->
-                    <div class="admin-card" style="overflow-x: auto;">
+                    <!-- Tabla -->
+                    <div class="card">
                         <h2>Productos en Catálogo</h2>
-                        <table class="table-products">
-                            <thead><tr><th>Producto</th><th>Categoría</th></tr></thead>
-                            <tbody id="table-body"></tbody>
-                        </table>
+                        <div class="table-responsive">
+                            <table class="table-pro">
+                                <thead><tr><th>Producto</th><th>Categoría</th></tr></thead>
+                                <tbody id="table-body"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- PESTAÑA: CLIENTES -->
             <div id="tab-clientes" class="admin-section">
-                <div class="admin-card">
+                <div class="card">
                     <h2>Laboratorios Registrados</h2>
-                    <table class="table-products">
-                        <thead>
-                            <tr>
-                                <th>Laboratorio</th>
-                                <th>RIF</th>
-                                <th>Contacto</th>
-                                <th>Estado</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="table-clientes"></tbody>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="table-pro">
+                            <thead>
+                                <tr>
+                                    <th>Laboratorio</th>
+                                    <th>RIF</th>
+                                    <th>Contacto</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-clientes"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
