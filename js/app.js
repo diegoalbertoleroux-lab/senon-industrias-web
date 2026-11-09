@@ -1,230 +1,131 @@
 import { auth, db } from './firebase-config.js';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { doc, setDoc, getDocs, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { doc, setDoc, getDocs, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// --- 1. VARIABLES GLOBALES ---
 let carrito = [];
 let usuarioActual = null;
-const catalogContainer = document.getElementById('catalog-container');
-const cartCount = document.getElementById('cart-count');
-const cartItemsContainer = document.getElementById('cart-items');
-const btnOpenAuth = document.getElementById('btn-open-auth');
 
-// --- 2. LÓGICA DEL MODO OSCURO ---
+// Modo Oscuro
 const themeToggle = document.getElementById('theme-toggle');
-const iconSun = document.getElementById('icon-sun');
-const iconMoon = document.getElementById('icon-moon');
-
-if (localStorage.getItem('theme') === 'dark') {
-    document.body.classList.add('dark');
-    iconSun.style.display = 'block';
-    iconMoon.style.display = 'none';
-}
-
+const themeIcon = document.getElementById('theme-icon');
+if (localStorage.getItem('theme') === 'dark') { document.body.classList.add('dark'); themeIcon.textContent = '☀️'; }
 themeToggle.addEventListener('click', () => {
     document.body.classList.toggle('dark');
     const isDark = document.body.classList.contains('dark');
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
-    iconSun.style.display = isDark ? 'block' : 'none';
-    iconMoon.style.display = isDark ? 'none' : 'block';
+    themeIcon.textContent = isDark ? '☀️' : '🌙';
 });
 
-// --- 3. CARGAR CATÁLOGO DESDE FIRESTORE ---
+// Cargar Catálogo
 async function cargarCatalogo() {
+    const container = document.getElementById('catalog-container');
     try {
         const querySnapshot = await getDocs(collection(db, "catalogo"));
-        catalogContainer.innerHTML = '';
+        container.innerHTML = '';
+        if(querySnapshot.empty) { container.innerHTML = '<p>No hay productos.</p>'; return; }
         
-        if(querySnapshot.empty) {
-            catalogContainer.innerHTML = '<p style="text-align:center; width:100%; grid-column: 1/-1;">No hay productos en el catálogo aún.</p>';
-            return;
-        }
-
         querySnapshot.forEach((doc) => {
             const prod = doc.data();
-            const card = document.createElement('div');
-            card.className = 'product-card';
-            card.innerHTML = `
-                <div class="product-category">${prod.categoria || 'General'}</div>
-                <h3 class="product-title">${prod.nombre}</h3>
-                <p class="product-desc">${prod.descripcion || ''}</p>
-                <div class="product-actions">
-                    <button class="btn-primary btn-add-cart" data-id="${doc.id}" data-nombre="${prod.nombre}">Agregar a Cotización</button>
-                </div>
-            `;
-            catalogContainer.appendChild(card);
+            container.innerHTML += `
+                <div class="product-card">
+                    <div class="badge">${prod.categoria}</div>
+                    <h3 class="product-title">${prod.nombre}</h3>
+                    <p class="product-desc">${prod.descripcion}</p>
+                    <button class="btn-primary btn-add-cart" data-id="${doc.id}" data-nombre="${prod.nombre}">Agregar</button>
+                </div>`;
         });
 
-        // Asignar eventos a los botones de agregar
         document.querySelectorAll('.btn-add-cart').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const id = e.target.getAttribute('data-id');
-                const nombre = e.target.getAttribute('data-nombre');
-                agregarAlCarrito(id, nombre);
-            });
+            btn.addEventListener('click', (e) => agregarAlCarrito(e.target.dataset.id, e.target.dataset.nombre));
         });
-
-    } catch (error) {
-        console.error("Error al cargar catálogo: ", error);
-        catalogContainer.innerHTML = '<p style="text-align:center; width:100%; grid-column: 1/-1; color:red;">Error al conectar con la base de datos.</p>';
-    }
+    } catch (error) { container.innerHTML = '<p>Error al cargar.</p>'; }
 }
 
-// --- 4. LÓGICA DEL CARRITO ---
+// Carrito
 function agregarAlCarrito(id, nombre) {
-    // Verificar si ya existe
-    const existe = carrito.find(item => item.id === id);
-    if (existe) {
-        existe.cantidad++;
-    } else {
-        carrito.push({ id, nombre, cantidad: 1 });
-    }
+    const item = carrito.find(i => i.id === id);
+    if (item) item.cantidad++; else carrito.push({ id, nombre, cantidad: 1 });
     actualizarUI();
 }
 
 function actualizarUI() {
-    // Actualizar contador flotante
-    const totalItems = carrito.reduce((sum, item) => sum + item.cantidad, 0);
-    cartCount.innerText = totalItems;
-
-    // Actualizar modal del carrito
-    cartItemsContainer.innerHTML = '';
-    if (carrito.length === 0) {
-        cartItemsContainer.innerHTML = '<p style="color:var(--text-muted); text-align:center;">El carrito está vacío.</p>';
-        return;
-    }
-
-    carrito.forEach((item, index) => {
-        const div = document.createElement('div');
-        div.style.display = 'flex';
-        div.style.justifyContent = 'space-between';
-        div.style.marginBottom = '10px';
-        div.style.borderBottom = '1px solid var(--border-color)';
-        div.style.paddingBottom = '10px';
-        div.innerHTML = `
-            <span>${item.nombre}</span>
-            <span><strong>${item.cantidad}</strong> ud.</span>
-        `;
-        cartItemsContainer.appendChild(div);
-    });
+    document.getElementById('cart-count').innerText = carrito.reduce((s, i) => s + i.cantidad, 0);
+    const container = document.getElementById('cart-items');
+    container.innerHTML = carrito.length === 0 ? '<p>Vacío.</p>' : carrito.map(i => `<div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span>${i.nombre}</span><b>${i.cantidad} ud.</b></div>`).join('');
 }
 
-// --- 5. MODALES (Abrir/Cerrar) ---
-const modalAuth = document.getElementById('modal-auth');
-const modalCart = document.getElementById('modal-cart');
+// Modales Generales
+function toggleModal(id, show) { document.getElementById(id).classList.toggle('active', show); }
+document.getElementById('btn-open-auth').addEventListener('click', () => toggleModal('modal-auth', true));
+document.getElementById('close-auth').addEventListener('click', () => toggleModal('modal-auth', false));
+document.getElementById('btn-open-cart').addEventListener('click', () => toggleModal('modal-cart', true));
+document.getElementById('close-cart').addEventListener('click', () => toggleModal('modal-cart', false));
+document.getElementById('btn-open-service').addEventListener('click', () => toggleModal('modal-service', true));
+document.getElementById('close-service').addEventListener('click', () => toggleModal('modal-service', false));
 
-btnOpenAuth.addEventListener('click', () => modalAuth.classList.add('active'));
-document.getElementById('close-auth').addEventListener('click', () => modalAuth.classList.remove('active'));
-
-document.getElementById('btn-open-cart').addEventListener('click', () => {
-    actualizarUI(); // Refrescar por si acaso
-    modalCart.classList.add('active');
-});
-document.getElementById('close-cart').addEventListener('click', () => modalCart.classList.remove('active'));
-
-// --- 6. AUTENTICACIÓN ---
-const tabLogin = document.getElementById('tab-login');
-const tabRegister = document.getElementById('tab-register');
-const formLogin = document.getElementById('form-login');
-const formRegister = document.getElementById('form-register');
+// Login / Registro
 const authMessage = document.getElementById('auth-message');
+document.getElementById('tab-login').addEventListener('click', () => { document.getElementById('tab-login').classList.add('active'); document.getElementById('tab-register').classList.remove('active'); document.getElementById('form-login').classList.add('active'); document.getElementById('form-register').classList.remove('active'); });
+document.getElementById('tab-register').addEventListener('click', () => { document.getElementById('tab-register').classList.add('active'); document.getElementById('tab-login').classList.remove('active'); document.getElementById('form-register').classList.add('active'); document.getElementById('form-login').classList.remove('active'); });
 
-tabLogin.addEventListener('click', () => {
-    tabLogin.classList.add('active'); tabRegister.classList.remove('active');
-    formLogin.classList.add('active'); formRegister.classList.remove('active');
-    authMessage.style.display = 'none';
-});
-
-tabRegister.addEventListener('click', () => {
-    tabRegister.classList.add('active'); tabLogin.classList.remove('active');
-    formRegister.classList.add('active'); formLogin.classList.remove('active');
-    authMessage.style.display = 'none';
-});
-
-function mostrarMensaje(texto, tipo) {
-    authMessage.textContent = texto;
-    authMessage.className = `message ${tipo}`;
-}
-
-// Login
-formLogin.addEventListener('submit', async (e) => {
+document.getElementById('form-login').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
-    try {
-        await signInWithEmailAndPassword(auth, email, password);
-        mostrarMensaje("Acceso correcto...", "success");
-        setTimeout(() => { modalAuth.classList.remove('active'); }, 1000);
-    } catch (error) {
-        mostrarMensaje("Correo o contraseña incorrectos.", "error");
-    }
+    try { await signInWithEmailAndPassword(auth, document.getElementById('login-email').value, document.getElementById('login-password').value); toggleModal('modal-auth', false); } 
+    catch (error) { authMessage.textContent = "Error de credenciales."; authMessage.className = "message error"; }
 });
 
-// Registro
-formRegister.addEventListener('submit', async (e) => {
+document.getElementById('form-register').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email = document.getElementById('reg-email').value;
-    const password = document.getElementById('reg-password').value;
-    
-    const datosCliente = {
-        rif: document.getElementById('reg-rif').value,
-        nombre_laboratorio: document.getElementById('reg-lab').value,
-        nombre_contacto: document.getElementById('reg-contacto').value,
-        telefono: document.getElementById('reg-telefono').value,
-        email: email,
-        estado: "pendiente",
-        nivel_precio: "D",
-        fecha_registro: new Date()
-    };
-
     try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        await setDoc(doc(db, "usuarios", userCredential.user.uid), datosCliente);
-        mostrarMensaje("Registro exitoso. Ya puedes ingresar.", "success");
-        setTimeout(() => { tabLogin.click(); }, 2000);
-    } catch (error) {
-        if (error.code === 'auth/email-already-in-use') mostrarMensaje("Este correo ya está registrado.", "error");
-        else mostrarMensaje("Error al registrar. Verifica los datos.", "error");
-    }
+        const user = await createUserWithEmailAndPassword(auth, document.getElementById('reg-email').value, document.getElementById('reg-password').value);
+        await setDoc(doc(db, "usuarios", user.user.uid), {
+            rif: document.getElementById('reg-rif').value, nombre_laboratorio: document.getElementById('reg-lab').value,
+            nombre_contacto: document.getElementById('reg-contacto').value, telefono: document.getElementById('reg-telefono').value,
+            email: document.getElementById('reg-email').value, estado: "pendiente"
+        });
+        authMessage.textContent = "Registrado. Espera aprobación."; authMessage.className = "message success";
+        setTimeout(() => document.getElementById('tab-login').click(), 2000);
+    } catch (error) { authMessage.textContent = "Error al registrar."; authMessage.className = "message error"; }
 });
 
-// Observador de Sesión (Si ya está logueado, cambia el botón)
 onAuthStateChanged(auth, (user) => {
+    usuarioActual = user;
+    const btn = document.getElementById('btn-open-auth');
     if (user) {
-        usuarioActual = user;
-        btnOpenAuth.textContent = "Cerrar Sesión";
-        btnOpenAuth.style.borderColor = "var(--primary)";
-        btnOpenAuth.style.color = "var(--primary)";
-        btnOpenAuth.onclick = () => {
-            signOut(auth);
-            window.location.reload();
-        };
+        btn.textContent = "Cerrar Sesión"; btn.onclick = () => { signOut(auth); window.location.reload(); };
     } else {
-        usuarioActual = null;
-        btnOpenAuth.textContent = "Ingresar / Registrarse";
-        btnOpenAuth.style.borderColor = "var(--border-color)";
-        btnOpenAuth.style.color = "var(--text-main)";
-        btnOpenAuth.onclick = () => modalAuth.classList.add('active');
+        btn.textContent = "Ingresar / Registrarse"; btn.onclick = () => toggleModal('modal-auth', true);
     }
 });
 
-// --- 7. BOTÓN DE SOLICITAR COTIZACIÓN ---
-document.getElementById('btn-request-quote').addEventListener('click', () => {
-    if (carrito.length === 0) {
-        alert("Agrega productos al carrito primero.");
-        return;
-    }
-    
-    if (!usuarioActual) {
-        // Si no está logueado, forzar el registro
-        modalCart.classList.remove('active');
-        modalAuth.classList.add('active');
-        mostrarMensaje("Debes registrarte o ingresar para solicitar una cotización.", "error");
-    } else {
-        // Si está logueado, procedemos (esto lo programaremos en la siguiente fase)
-        alert("¡Perfecto! Estás registrado. En la siguiente fase guardaremos esta solicitud en Firebase para enviártela por WhatsApp.");
-    }
+// Guardar Cotización
+document.getElementById('btn-request-quote').addEventListener('click', async () => {
+    if (carrito.length === 0) return alert("Carrito vacío");
+    if (!usuarioActual) { toggleModal('modal-cart', false); toggleModal('modal-auth', true); return alert("Inicia sesión para cotizar"); }
+
+    try {
+        await addDoc(collection(db, "cotizaciones"), {
+            cliente_id: usuarioActual.uid, email: usuarioActual.email,
+            productos: carrito, estado: "pendiente", fecha: new Date()
+        });
+        alert("¡Solicitud enviada! El administrador la revisará pronto.");
+        carrito = []; actualizarUI(); toggleModal('modal-cart', false);
+    } catch (error) { alert("Error al enviar solicitud."); }
 });
 
-// Inicializar
+// Guardar Ticket de Servicio
+document.getElementById('form-service').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+        await addDoc(collection(db, "tickets_servicio"), {
+            cliente: document.getElementById('srv-lab').value, equipo: document.getElementById('srv-equipo').value,
+            falla: document.getElementById('srv-falla').value, estado: "Recibido", fecha: new Date()
+        });
+        const msg = document.getElementById('service-message');
+        msg.textContent = "Reporte enviado correctamente."; msg.className = "message success";
+        document.getElementById('form-service').reset();
+        setTimeout(() => { toggleModal('modal-service', false); msg.style.display = 'none'; }, 2000);
+    } catch (error) { alert("Error al enviar reporte."); }
+});
+
 cargarCatalogo();
