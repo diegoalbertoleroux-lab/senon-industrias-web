@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Senon Industrias | Catálogo B2B</title>
+    
+    <!-- ETIQUETAS PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ff6b00">
+    
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -13,89 +18,78 @@
             <div class="logo-text">SENON</div>
             <div class="logo-subtext">INDUSTRIAS C.A.</div>
         </div>
-        <div class="header-actions" style="display:flex; gap:10px; align-items:center;">
-            <button class="theme-toggle" id="theme-toggle" style="background:none; border:none; cursor:pointer; font-size:20px;">
-                <span id="theme-icon">🌙</span>
-            </button>
-            <!-- NUEVO BOTÓN DE SERVICIO TÉCNICO -->
-            <button class="btn-outline" id="btn-open-service">Servicio Técnico</button>
-            <button class="btn-outline" id="btn-open-auth">Ingresar / Registrarse</button>
+        <div class="header-actions" style="display:flex; gap:15px; align-items:center;">
+            <button class="btn btn-outline" id="theme-toggle">🌙</button>
+            <button class="btn btn-outline" id="btn-open-service">Servicio Técnico</button>
+            <button class="btn btn-primary" id="btn-open-auth">Ingresar</button>
         </div>
     </header>
 
     <main class="public-main">
-        <section class="hero">
-            <h1>Catálogo de Reactivos y Equipos</h1>
-            <p>Distribución de insumos para laboratorios clínicos. Inicia sesión para ver precios y cotizar.</p>
-            <div class="search-bar">
+        <section class="hero" style="text-align: center;">
+            <h1>Catálogo Especializado</h1>
+            <p>Insumos de alta precisión para laboratorios clínicos.</p>
+            <div class="search-bar" style="display:flex; justify-content:center;">
                 <input type="text" id="search-input" placeholder="Buscar por nombre, marca o categoría...">
             </div>
         </section>
 
         <section class="catalog-grid" id="catalog-container">
-            <p style="text-align:center; width:100%; grid-column: 1/-1; color: var(--text-muted);">Cargando catálogo...</p>
+            <p style="text-align:center; grid-column: 1/-1;">Cargando catálogo...</p>
         </section>
     </main>
 
-    <button class="cart-btn" id="btn-open-cart">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="28" height="28"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-        <span class="cart-count" id="cart-count">0</span>
+    <!-- Botón flotante del carrito -->
+    <button class="btn btn-primary" id="btn-open-cart" style="position:fixed; bottom:30px; right:30px; border-radius:50%; width:60px; height:60px; font-size:24px; box-shadow: var(--shadow-lg);">
+        🛒 <span id="cart-count" style="position:absolute; top:-5px; right:-5px; background:var(--accent); color:white; border-radius:50%; padding:2px 8px; font-size:12px;">0</span>
     </button>
 
-    <!-- MODAL: LOGIN / REGISTRO -->
+    <!-- MODALES -->
     <div class="modal-overlay" id="modal-auth">
-        <div class="modal-content">
+        <div class="modal-content" style="position:relative;">
             <button class="close-modal" id="close-auth">×</button>
-            <div class="logo-container" style="text-align: center; margin-bottom: 20px;">
-                <div class="logo-text">SENON</div>
-            </div>
+            <h2 style="text-align:center; margin-bottom:20px;">Acceso al Portal</h2>
             <div id="auth-message" class="message"></div>
-            <div class="tabs">
-                <button class="tab active" id="tab-login">Iniciar Sesión</button>
-                <button class="tab" id="tab-register">Nuevo Registro</button>
+            <div style="display:flex; gap:10px; margin-bottom:20px;">
+                <button class="btn btn-outline w-100" id="tab-login">Ingresar</button>
+                <button class="btn btn-outline w-100" id="tab-register">Registro</button>
             </div>
             <form id="form-login" class="form-section active">
-                <div class="form-group"><label>Correo</label><input type="email" id="login-email" class="form-control" required></div>
-                <div class="form-group"><label>Contraseña</label><input type="password" id="login-password" class="form-control" required></div>
-                <button type="submit" class="btn-primary btn-full" id="btn-login">Ingresar</button>
+                <div class="form-group"><input type="email" id="login-email" class="form-control" placeholder="Correo" required></div>
+                <div class="form-group"><input type="password" id="login-password" class="form-control" placeholder="Contraseña" required></div>
+                <button type="submit" class="btn btn-primary w-100">Entrar</button>
             </form>
-            <form id="form-register" class="form-section">
-                <div class="form-group"><label>RIF</label><input type="text" id="reg-rif" class="form-control" required></div>
-                <div class="form-group"><label>Nombre del Laboratorio</label><input type="text" id="reg-lab" class="form-control" required></div>
-                <div class="form-group"><label>Bioanalista</label><input type="text" id="reg-contacto" class="form-control" required></div>
-                <div class="form-group"><label>Teléfono</label><input type="tel" id="reg-telefono" class="form-control" required></div>
-                <div class="form-group"><label>Correo</label><input type="email" id="reg-email" class="form-control" required></div>
-                <div class="form-group"><label>Contraseña</label><input type="password" id="reg-password" class="form-control" required minlength="6"></div>
-                <button type="submit" class="btn-primary btn-full" id="btn-register">Registrarse</button>
+            <form id="form-register" class="form-section" style="display:none;">
+                <div class="form-group"><input type="text" id="reg-rif" class="form-control" placeholder="RIF" required></div>
+                <div class="form-group"><input type="text" id="reg-lab" class="form-control" placeholder="Nombre del Laboratorio" required></div>
+                <div class="form-group"><input type="text" id="reg-contacto" class="form-control" placeholder="Nombre del Bioanalista" required></div>
+                <div class="form-group"><input type="tel" id="reg-telefono" class="form-control" placeholder="Teléfono" required></div>
+                <div class="form-group"><input type="email" id="reg-email" class="form-control" placeholder="Correo" required></div>
+                <div class="form-group"><input type="password" id="reg-password" class="form-control" placeholder="Contraseña" required></div>
+                <button type="submit" class="btn btn-primary w-100">Registrarse</button>
             </form>
         </div>
     </div>
 
-    <!-- MODAL: CARRITO -->
     <div class="modal-overlay" id="modal-cart">
-        <div class="modal-content">
+        <div class="modal-content" style="position:relative;">
             <button class="close-modal" id="close-cart">×</button>
-            <h2>Mi Cotización</h2>
-            <div id="cart-items" style="margin-bottom: 20px;"></div>
-            <button class="btn-primary btn-full" id="btn-request-quote">Solicitar Cotización</button>
+            <h2>Mi Carrito</h2>
+            <div id="cart-items" style="margin: 20px 0;"></div>
+            <button class="btn btn-primary w-100" id="btn-request-quote">Solicitar Cotización</button>
         </div>
     </div>
 
-    <!-- MODAL: SERVICIO TÉCNICO -->
-    <div class="modal-overlay" id="modal-service">
-        <div class="modal-content">
-            <button class="close-modal" id="close-service">×</button>
-            <h2>Reportar Falla de Equipo</h2>
-            <div id="service-message" class="message"></div>
-            <form id="form-service">
-                <div class="form-group"><label>Nombre del Laboratorio</label><input type="text" id="srv-lab" class="form-control" required></div>
-                <div class="form-group"><label>Equipo afectado</label><input type="text" id="srv-equipo" class="form-control" placeholder="Ej. Centrífuga" required></div>
-                <div class="form-group"><label>Falla reportada</label><textarea id="srv-falla" class="form-control" rows="3" required></textarea></div>
-                <button type="submit" class="btn-primary btn-full" id="btn-send-service">Enviar Reporte</button>
-            </form>
-        </div>
-    </div>
-
+    <!-- SCRIPT PWA -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').then(function(registration) {
+                console.log('Service Worker registrado con éxito:', registration.scope);
+            }).catch(function(error) {
+                console.log('Fallo al registrar el Service Worker:', error);
+            });
+        }
+    </script>
     <script type="module" src="js/app.js"></script>
 </body>
 </html>
