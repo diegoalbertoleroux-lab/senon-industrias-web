@@ -10,8 +10,6 @@
 
     <!-- PANTALLA DE LOGIN (DISEÑO SPLIT) -->
     <div id="admin-login" class="login-split-container">
-        
-        <!-- Lado Izquierdo (Marca) -->
         <div class="login-left">
             <div class="login-left-content">
                 <div class="brand-logo-large">SENON</div>
@@ -22,15 +20,11 @@
                 Senon Industrias · RIF J-50719484-1
             </div>
         </div>
-
-        <!-- Lado Derecho (Formulario) -->
         <div class="login-right">
             <div class="login-form-box">
                 <h1 class="login-title">INICIAR SESIÓN</h1>
                 <p class="login-subtitle">Ingresa con el usuario asignado por la administración.</p>
-                
                 <div id="login-msg" class="message"></div>
-                
                 <form id="form-admin-login">
                     <div class="form-group">
                         <label>USUARIO (CORREO)</label>
@@ -49,9 +43,8 @@
         </div>
     </div>
 
-    <!-- APLICACIÓN ADMIN (Oculta por defecto) -->
+    <!-- APLICACIÓN ADMIN -->
     <div id="admin-main" style="display: none;">
-        
         <header class="admin-header">
             <div class="logo-container">
                 <div class="logo-text">SENON <span style="font-size:14px; color:var(--primary); background:var(--input-bg); padding:4px 8px; border-radius:4px;">ADMIN</span></div>
@@ -63,7 +56,6 @@
         </header>
 
         <main class="admin-container">
-            <!-- Pestañas -->
             <div class="admin-tabs">
                 <button class="admin-tab active" data-target="tab-inventario">Inventario y Precios</button>
                 <button class="admin-tab" data-target="tab-clientes">Directorio de Clientes</button>
@@ -72,8 +64,6 @@
             <!-- PESTAÑA: INVENTARIO -->
             <div id="tab-inventario" class="admin-section active">
                 <div class="grid-layout">
-                    
-                    <!-- Formulario -->
                     <div class="card">
                         <h2>Añadir Nuevo Producto</h2>
                         <div id="admin-message" class="message"></div>
@@ -94,9 +84,8 @@
                             </div>
                             <div class="form-group">
                                 <label>Descripción Pública</label>
-                                <textarea id="prod-desc" class="form-control" rows="3" placeholder="Breve descripción del reactivo..." required></textarea>
+                                <textarea id="prod-desc" class="form-control" rows="3" placeholder="Breve descripción..." required></textarea>
                             </div>
-                            
                             <div class="form-group">
                                 <label style="color: var(--primary);">Precios (Confidencial)</label>
                                 <div class="grid-precios">
@@ -106,12 +95,10 @@
                                     <div><label>D (USD)</label><input type="number" step="0.01" id="prod-pD" class="form-control" required></div>
                                 </div>
                             </div>
-
                             <button type="submit" class="btn-primary btn-full" id="btn-save" style="margin-top: 10px;">Guardar en Base de Datos</button>
                         </form>
                     </div>
 
-                    <!-- Tabla -->
                     <div class="card">
                         <h2>Productos en Catálogo</h2>
                         <div class="table-responsive">
@@ -144,7 +131,6 @@
                     </div>
                 </div>
             </div>
-
         </main>
     </div>
 
