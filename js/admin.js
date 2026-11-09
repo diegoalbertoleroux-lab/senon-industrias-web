@@ -8,7 +8,8 @@ const adminMain = document.getElementById('admin-main');
 const formLogin = document.getElementById('form-admin-login');
 const loginMsg = document.getElementById('login-msg');
 
-// IMPORTANTE: Pon aquí el correo exacto que creaste en Firebase Auth
+// ⚠️ IMPORTANTE: Pon aquí el correo EXACTO que creaste en Firebase Authentication
+// Ejemplo: "diegoalbertoleroux@gmail.com"
 const ADMIN_EMAIL = "TU_CORREO_AQUI@gmail.com"; 
 
 formLogin.addEventListener('submit', async (e) => {
@@ -16,21 +17,35 @@ formLogin.addEventListener('submit', async (e) => {
     const email = document.getElementById('admin-email').value;
     const pass = document.getElementById('admin-password').value;
     
+    // Mostrar mensaje de espera
+    loginMsg.textContent = "Verificando...";
+    loginMsg.className = "message";
+    loginMsg.style.display = 'block';
+
     try {
         await signInWithEmailAndPassword(auth, email, pass);
         loginMsg.style.display = 'none';
     } catch (error) {
-        loginMsg.textContent = "Credenciales incorrectas.";
+        console.error("Error de login:", error);
+        // Aquí mostramos el error real en pantalla para saber qué pasa
+        loginMsg.textContent = "Error: " + error.code; 
         loginMsg.className = "message error";
     }
 });
 
 onAuthStateChanged(auth, (user) => {
+    // Verificamos que haya un usuario Y que sea el administrador
     if (user && user.email === ADMIN_EMAIL) {
         loginSection.style.display = 'none';
         adminMain.style.display = 'block';
         cargarProductos();
         cargarClientes();
+    } else if (user && user.email !== ADMIN_EMAIL) {
+        // Si es un cliente que intentó entrar al admin, lo sacamos
+        signOut(auth);
+        loginMsg.textContent = "No tienes permisos de administrador.";
+        loginMsg.className = "message error";
+        loginMsg.style.display = 'block';
     } else {
         loginSection.style.display = 'flex';
         adminMain.style.display = 'none';
