@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ERP | Senon Industrias</title>
+    
+    <!-- ETIQUETAS PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ff6b00">
+    
     <link rel="stylesheet" href="css/styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -94,7 +99,7 @@
                 </div>
             </section>
 
-            <!-- VENTAS (Reemplaza a Facturación) -->
+            <!-- VENTAS -->
             <section id="view-ventas" class="view-section">
                 <div class="card">
                     <h2>Registro de Ventas</h2>
@@ -214,7 +219,7 @@
         </main>
     </div>
 
-    <!-- MODAL: NUEVO CLIENTE MANUAL -->
+    <!-- MODALES -->
     <div class="modal-overlay" id="modal-cliente">
         <div class="modal-content">
             <button class="close-modal" onclick="document.getElementById('modal-cliente').classList.remove('active')">×</button>
@@ -229,7 +234,6 @@
         </div>
     </div>
 
-    <!-- MODAL: PRODUCTO CON PROVEEDOR -->
     <div class="modal-overlay" id="modal-producto">
         <div class="modal-content" style="max-width: 600px;">
             <button class="close-modal" onclick="document.getElementById('modal-producto').classList.remove('active')">×</button>
@@ -260,7 +264,6 @@
         </div>
     </div>
 
-    <!-- MODAL: COTIZACIÓN MANUAL -->
     <div class="modal-overlay" id="modal-cotizacion-manual">
         <div class="modal-content" style="max-width: 700px;">
             <button class="close-modal" onclick="document.getElementById('modal-cotizacion-manual').classList.remove('active')">×</button>
@@ -291,7 +294,6 @@
         </div>
     </div>
 
-    <!-- MODAL: REPARACIÓN MANUAL -->
     <div class="modal-overlay" id="modal-reparacion">
         <div class="modal-content">
             <button class="close-modal" onclick="document.getElementById('modal-reparacion').classList.remove('active')">×</button>
@@ -305,7 +307,6 @@
         </div>
     </div>
 
-    <!-- MODAL: PROCESAR COTIZACIÓN WEB -->
     <div class="modal-overlay" id="modal-cotizar">
         <div class="modal-content">
             <button class="close-modal" onclick="document.getElementById('modal-cotizar').classList.remove('active')">×</button>
@@ -322,6 +323,16 @@
         </div>
     </div>
 
+    <!-- SCRIPT PWA -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').then(function(registration) {
+                console.log('Service Worker registrado con éxito:', registration.scope);
+            }).catch(function(error) {
+                console.log('Fallo al registrar el Service Worker:', error);
+            });
+        }
+    </script>
     <script type="module" src="js/admin.js"></script>
 </body>
 </html>
