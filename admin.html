@@ -7,10 +7,11 @@
     <link rel="stylesheet" href="css/styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
 
-    <!-- LOGIN -->
     <div id="admin-login" style="display:flex; justify-content:center; align-items:center; height:100vh; width:100%;">
         <div class="card" style="width: 100%; max-width: 400px;">
             <div style="text-align:center; margin-bottom:20px;">
@@ -26,10 +27,7 @@
         </div>
     </div>
 
-    <!-- APP PRINCIPAL -->
     <div id="app-main" style="display: none;">
-        
-        <!-- SIDEBAR -->
         <aside class="sidebar">
             <div class="sidebar-header">
                 <img src="img/logo.png" alt="Senon">
@@ -37,7 +35,7 @@
             <nav class="sidebar-menu">
                 <a class="menu-item active" data-view="view-dashboard">Dashboard</a>
                 <a class="menu-item" data-view="view-cotizaciones">Cotizaciones</a>
-                <a class="menu-item" data-view="view-facturas">Facturación</a>
+                <a class="menu-item" data-view="view-ventas">Ventas</a>
                 <a class="menu-item" data-view="view-inventario">Inventario</a>
                 <a class="menu-item" data-view="view-clientes">Clientes</a>
                 <a class="menu-item" data-view="view-proveedores">Proveedores y Compras</a>
@@ -58,25 +56,29 @@
                 <div class="tasa-display" id="tasa-display">Tasa BCV: Cargando...</div>
             </header>
 
-            <!-- VISTA: DASHBOARD -->
+            <!-- DASHBOARD -->
             <section id="view-dashboard" class="view-section active">
                 <div class="grid-3">
                     <div class="card">
-                        <h3 style="font-size:13px; color:var(--text-muted); text-transform:uppercase;">Ingresos Totales (USD)</h3>
-                        <h2 style="font-size:32px; color:var(--accent);">$0.00</h2>
+                        <h3 style="font-size:13px; color:var(--text-muted); text-transform:uppercase;">Ingresos por Ventas</h3>
+                        <h2 style="font-size:32px; color:var(--accent);" id="dash-ingresos">$0.00</h2>
                     </div>
                     <div class="card">
                         <h3 style="font-size:13px; color:var(--text-muted); text-transform:uppercase;">Ganancia Neta</h3>
-                        <h2 style="font-size:32px;">$0.00</h2>
+                        <h2 style="font-size:32px;" id="dash-ganancia">$0.00</h2>
                     </div>
                     <div class="card">
-                        <h3 style="font-size:13px; color:var(--text-muted); text-transform:uppercase;">Por Cobrar</h3>
-                        <h2 style="font-size:32px; color: #10b981;">$0.00</h2>
+                        <h3 style="font-size:13px; color:var(--text-muted); text-transform:uppercase;">Total por Cobrar</h3>
+                        <h2 style="font-size:32px; color: #10b981;" id="dash-cobrar">$0.00</h2>
                     </div>
+                </div>
+                <div class="card">
+                    <h3>Resumen Gráfico</h3>
+                    <canvas id="chart-dashboard" height="80"></canvas>
                 </div>
             </section>
 
-            <!-- VISTA: COTIZACIONES -->
+            <!-- COTIZACIONES -->
             <section id="view-cotizaciones" class="view-section">
                 <div class="card">
                     <div class="card-header">
@@ -92,72 +94,84 @@
                 </div>
             </section>
 
-            <!-- VISTA: FACTURACIÓN -->
-            <section id="view-facturas" class="view-section">
+            <!-- VENTAS (Reemplaza a Facturación) -->
+            <section id="view-ventas" class="view-section">
                 <div class="card">
-                    <div class="card-header">
-                        <h2>Facturación (Cotizaciones Aprobadas)</h2>
-                    </div>
+                    <h2>Registro de Ventas</h2>
                     <div class="table-responsive">
                         <table class="table-pro">
-                            <thead><tr><th>Fecha</th><th>Cliente</th><th>Total USD</th><th>Estado</th><th>Acciones</th></tr></thead>
-                            <tbody id="tbody-facturas"></tbody>
+                            <thead><tr><th>Fecha</th><th>Cliente</th><th>Total USD</th><th>Acciones</th></tr></thead>
+                            <tbody id="tbody-ventas"></tbody>
                         </table>
                     </div>
                 </div>
             </section>
 
-            <!-- VISTA: INVENTARIO -->
+            <!-- INVENTARIO -->
             <section id="view-inventario" class="view-section">
                 <div class="card">
                     <div class="card-header">
                         <h2>Inventario General</h2>
                         <div style="display:flex; gap:10px;">
-                            <select id="filtro-categoria-inv" class="form-control" style="width:200px;" onchange="filtrarInventario()">
-                                <option value="">Todas las categorías</option>
+                            <select id="filtro-categoria-inv" class="form-control" style="width:150px;" onchange="filtrarInventario()">
+                                <option value="">Categorías</option>
                             </select>
+                            <button class="btn btn-outline btn-sm" onclick="exportarListaPrecios()">Exportar Lista</button>
                             <button class="btn btn-primary btn-sm" onclick="abrirModalProducto()">+ Nuevo Producto</button>
                         </div>
                     </div>
                     <div class="table-responsive">
                         <table class="table-pro">
-                            <thead><tr><th>Código</th><th>Producto</th><th>Categoría</th><th>Stock</th><th>Costo</th><th>Precio A</th><th>Exento</th><th>Acciones</th></tr></thead>
+                            <thead><tr><th>Código</th><th>Producto</th><th>Proveedor</th><th>Stock</th><th>Precio A</th><th>Acciones</th></tr></thead>
                             <tbody id="tbody-inventario"></tbody>
                         </table>
                     </div>
                 </div>
             </section>
 
-            <!-- VISTA: CLIENTES -->
+            <!-- CLIENTES -->
             <section id="view-clientes" class="view-section">
                 <div class="card">
-                    <h2>Directorio de Clientes</h2>
-                    <div class="table-responsive"><table class="table-pro"><thead><tr><th>Laboratorio</th><th>RIF</th><th>Contacto</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="tbody-clientes"></tbody></table></div>
+                    <div class="card-header">
+                        <h2>Directorio de Clientes</h2>
+                        <button class="btn btn-primary btn-sm" onclick="document.getElementById('modal-cliente').classList.add('active')">+ Nuevo Cliente</button>
+                    </div>
+                    <div class="table-responsive"><table class="table-pro"><thead><tr><th>Laboratorio</th><th>RIF</th><th>Contacto</th><th>Acciones</th></tr></thead><tbody id="tbody-clientes"></tbody></table></div>
                 </div>
             </section>
 
-            <!-- VISTA: PROVEEDORES Y COMPRAS -->
+            <!-- PROVEEDORES Y COMPRAS -->
             <section id="view-proveedores" class="view-section">
                 <div class="grid-2">
                     <div class="card">
-                        <h2>Registrar Proveedor</h2>
-                        <form id="form-proveedor">
-                            <div class="form-group"><label>Nombre</label><input type="text" id="prov-nombre" class="form-control" required></div>
-                            <div class="form-group"><label>RIF</label><input type="text" id="prov-rif" class="form-control" required></div>
-                            <button type="submit" class="btn btn-primary w-100">Guardar</button>
+                        <h2>Proveedores Registrados</h2>
+                        <form id="form-proveedor" style="display:flex; gap:10px; margin-bottom:15px;">
+                            <input type="text" id="prov-nombre" class="form-control" placeholder="Nombre" required>
+                            <input type="text" id="prov-rif" class="form-control" placeholder="RIF" required>
+                            <button type="submit" class="btn btn-primary">+</button>
                         </form>
+                        <div class="table-responsive">
+                            <table class="table-pro">
+                                <thead><tr><th>Nombre</th><th>RIF</th></tr></thead>
+                                <tbody id="tbody-proveedores"></tbody>
+                            </table>
+                        </div>
                     </div>
                     <div class="card">
                         <h2>Registrar Compra</h2>
                         <form id="form-compra">
                             <div class="form-group"><label>Proveedor</label><select id="compra-proveedor" class="form-control"></select></div>
-                            <div class="form-group">
-                                <label>Buscar Producto (Búsqueda Inteligente)</label>
-                                <input type="text" id="compra-buscar-prod" class="form-control" placeholder="Escribe el nombre o código..." oninput="buscarProductoCompra()">
-                                <div id="resultados-busqueda" style="background:var(--bg-body); border:1px solid var(--border); border-radius:8px; margin-top:5px; display:none; max-height:150px; overflow-y:auto; position:absolute; z-index:100; width: 90%;"></div>
+                            <div class="form-group" style="position:relative;">
+                                <label>Buscar Producto</label>
+                                <input type="text" id="compra-buscar-prod" class="form-control" placeholder="Escriba nombre o código..." autocomplete="off">
+                                <div id="res-compra" style="background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; display:none; max-height:200px; overflow-y:auto; position:absolute; z-index:999; width:100%;"></div>
                             </div>
-                            <div id="lista-compra-actual" style="margin-bottom:15px;"></div>
-                            <div class="form-group"><label>Total Compra (USD)</label><input type="number" step="0.01" id="compra-monto" class="form-control" required readonly></div>
+                            <div id="lista-compra" style="margin-bottom:15px;"></div>
+                            <div class="form-group" style="display:flex; align-items:center; gap:10px;">
+                                <input type="checkbox" id="compra-iva" style="width:18px; height:18px;">
+                                <label style="margin:0;">¿La compra tiene IVA (16%)?</label>
+                            </div>
+                            <div class="form-group"><label>Total Compra (USD)</label><input type="text" id="compra-monto" class="form-control" readonly value="$0.00"></div>
                             <div class="form-group" style="display:flex; align-items:center; gap:10px;">
                                 <input type="checkbox" id="compra-pagada" style="width:18px; height:18px;">
                                 <label style="margin:0;">¿Ya fue pagada?</label>
@@ -168,12 +182,12 @@
                 </div>
             </section>
 
-            <!-- VISTA: SERVICIO TÉCNICO -->
+            <!-- SERVICIO TÉCNICO -->
             <section id="view-servicio" class="view-section">
                 <div class="card">
                     <div class="card-header">
                         <h2>Tickets de Servicio</h2>
-                        <button class="btn btn-primary btn-sm" onclick="document.getElementById('modal-reparacion').classList.add('active')">+ Reportar Equipo Manual</button>
+                        <button class="btn btn-primary btn-sm" onclick="document.getElementById('modal-reparacion').classList.add('active')">+ Reportar Equipo</button>
                     </div>
                     <div class="table-responsive">
                         <table class="table-pro">
@@ -184,7 +198,7 @@
                 </div>
             </section>
 
-            <!-- VISTA: CUENTAS -->
+            <!-- CUENTAS -->
             <section id="view-cuentas" class="view-section">
                 <div class="grid-2">
                     <div class="card">
@@ -200,8 +214,22 @@
         </main>
     </div>
 
-    <!-- MODALES -->
-    <!-- Modal Producto -->
+    <!-- MODAL: NUEVO CLIENTE MANUAL -->
+    <div class="modal-overlay" id="modal-cliente">
+        <div class="modal-content">
+            <button class="close-modal" onclick="document.getElementById('modal-cliente').classList.remove('active')">×</button>
+            <h2>Nuevo Cliente</h2>
+            <form id="form-cliente-manual">
+                <div class="form-group"><label>Laboratorio</label><input type="text" id="cli-lab" class="form-control" required></div>
+                <div class="form-group"><label>RIF</label><input type="text" id="cli-rif" class="form-control" required></div>
+                <div class="form-group"><label>Contacto</label><input type="text" id="cli-contacto" class="form-control" required></div>
+                <div class="form-group"><label>Email</label><input type="email" id="cli-email" class="form-control" required></div>
+                <button type="submit" class="btn btn-primary w-100">Guardar Cliente</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: PRODUCTO CON PROVEEDOR -->
     <div class="modal-overlay" id="modal-producto">
         <div class="modal-content" style="max-width: 600px;">
             <button class="close-modal" onclick="document.getElementById('modal-producto').classList.remove('active')">×</button>
@@ -215,36 +243,38 @@
                 <div class="form-group"><label>Nombre</label><input type="text" id="inv-nombre" class="form-control" required></div>
                 <div class="grid-2">
                     <div class="form-group"><label>Categoría</label><input type="text" id="inv-categoria" class="form-control" required></div>
-                    <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-top:20px;">
-                        <input type="checkbox" id="inv-exento" style="width:20px; height:20px;">
-                        <label style="margin:0;">Exento de IVA</label>
-                    </div>
+                    <div class="form-group"><label>Proveedor</label><select id="inv-proveedor" class="form-control"></select></div>
                 </div>
                 <div class="grid-2">
                     <div class="form-group"><label>Costo USD</label><input type="number" step="0.01" id="inv-costo" class="form-control" required></div>
                     <div class="form-group"><label>Precio A (Base)</label><input type="number" step="0.01" id="inv-pA" class="form-control" required></div>
                 </div>
-                <div class="form-group"><label>Stock</label><input type="number" id="inv-stock" class="form-control" value="0"></div>
+                <div class="grid-2">
+                    <div class="form-group"><label>Stock</label><input type="number" id="inv-stock" class="form-control" value="0"></div>
+                    <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-top:20px;">
+                        <input type="checkbox" id="inv-exento" style="width:20px; height:20px;"><label>Exento de IVA</label>
+                    </div>
+                </div>
                 <button type="submit" class="btn btn-primary w-100" style="margin-top:15px;">Guardar Producto</button>
             </form>
         </div>
     </div>
 
-    <!-- Modal Nueva Cotización Manual (Faltaba esto) -->
+    <!-- MODAL: COTIZACIÓN MANUAL -->
     <div class="modal-overlay" id="modal-cotizacion-manual">
         <div class="modal-content" style="max-width: 700px;">
             <button class="close-modal" onclick="document.getElementById('modal-cotizacion-manual').classList.remove('active')">×</button>
             <h2>Crear Cotización Manual</h2>
             <div class="form-group">
-                <label>Laboratorio / Cliente</label>
+                <label>Cliente</label>
                 <select id="manual-cot-cliente" class="form-control"></select>
             </div>
             <div class="form-group" style="position:relative;">
                 <label>Buscar Producto</label>
-                <input type="text" id="manual-buscar-prod" class="form-control" placeholder="Escriba para buscar..." oninput="buscarProductoManual()">
-                <div id="manual-resultados" style="background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; display:none; max-height:150px; overflow-y:auto; position:absolute; z-index:100; width:100%;"></div>
+                <input type="text" id="manual-buscar" class="form-control" placeholder="Escriba nombre..." autocomplete="off">
+                <div id="res-manual" style="background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; display:none; max-height:200px; overflow-y:auto; position:absolute; z-index:999; width:100%;"></div>
             </div>
-            <div id="manual-lista-items" style="margin-bottom:15px; background:var(--bg-body); padding:15px; border-radius:8px;"></div>
+            <div id="manual-lista" style="margin-bottom:15px; background:var(--bg-body); padding:15px; border-radius:8px;"></div>
             <div class="grid-2">
                 <div class="form-group">
                     <label>Nivel de Precio</label>
@@ -255,45 +285,40 @@
                         <option value="precio_D">Nivel D (-15%)</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>Total (USD)</label>
-                    <input type="text" id="manual-total" class="form-control" readonly value="$0.00">
-                </div>
+                <div class="form-group"><label>Total</label><input type="text" id="manual-total" class="form-control" readonly value="$0.00"></div>
             </div>
-            <button class="btn btn-primary w-100" onclick="guardarCotizacionManual()">Generar y Guardar Cotización</button>
+            <button class="btn btn-primary w-100" onclick="guardarCotizacionManual()">Generar Cotización</button>
         </div>
     </div>
 
-    <!-- Modal Reparación Manual -->
+    <!-- MODAL: REPARACIÓN MANUAL -->
     <div class="modal-overlay" id="modal-reparacion">
         <div class="modal-content">
             <button class="close-modal" onclick="document.getElementById('modal-reparacion').classList.remove('active')">×</button>
-            <h2>Registrar Reparación Manual</h2>
+            <h2>Registrar Reparación</h2>
             <form id="form-reparacion-manual">
-                <div class="form-group"><label>Laboratorio / Cliente</label><input type="text" id="rep-cliente" class="form-control" required></div>
+                <div class="form-group"><label>Cliente</label><input type="text" id="rep-cliente" class="form-control" required></div>
                 <div class="form-group"><label>Equipo</label><input type="text" id="rep-equipo" class="form-control" required></div>
                 <div class="form-group"><label>Falla</label><textarea id="rep-falla" class="form-control" required></textarea></div>
-                <button type="submit" class="btn btn-primary w-100">Registrar Ticket</button>
+                <button type="submit" class="btn btn-primary w-100">Registrar</button>
             </form>
         </div>
     </div>
 
-    <!-- Modal Procesar Cotización Web -->
+    <!-- MODAL: PROCESAR COTIZACIÓN WEB -->
     <div class="modal-overlay" id="modal-cotizar">
         <div class="modal-content">
             <button class="close-modal" onclick="document.getElementById('modal-cotizar').classList.remove('active')">×</button>
             <h2>Procesar Cotización Web</h2>
-            <div id="cotizar-detalles" style="margin-bottom:20px; background:var(--bg-body); padding:15px; border-radius:8px;"></div>
+            <div id="cotizar-detalles" style="margin-bottom:20px;"></div>
             <div class="form-group">
-                <label>Seleccionar Nivel de Precio</label>
+                <label>Nivel de Precio</label>
                 <select id="cotizar-nivel" class="form-control">
-                    <option value="precio_A">Nivel A (Base)</option>
-                    <option value="precio_B">Nivel B (-5%)</option>
-                    <option value="precio_C">Nivel C (-10%)</option>
-                    <option value="precio_D">Nivel D (-15%)</option>
+                    <option value="precio_A">A</option><option value="precio_B">B</option>
+                    <option value="precio_C">C</option><option value="precio_D">D</option>
                 </select>
             </div>
-            <button class="btn btn-primary w-100" onclick="guardarCotizacionWeb()">Aprobar y Pasar a Facturación</button>
+            <button class="btn btn-primary w-100" onclick="guardarCotizacionWeb()">Aprobar</button>
         </div>
     </div>
 
