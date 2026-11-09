@@ -13,6 +13,10 @@ let COMPRA_ITEMS = [];
 let chartInstance = null;
 let TOTAL_GASTOS = 0;
 
+// Variables para controlar desde dónde abrimos el modal de producto
+let origenCreacion = 'inventario'; 
+let buscadorActivo = ''; // 'compra' o 'manual'
+
 // --- LOGIN Y NAVEGACIÓN ---
 document.getElementById('form-admin-login').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -102,6 +106,7 @@ window.filtrarInventario = () => {
 };
 
 window.abrirModalProducto = () => {
+    origenCreacion = 'inventario'; // Resetea el origen
     document.getElementById('form-producto').reset();
     document.getElementById('prod-id').value = '';
     document.getElementById('modal-prod-title').textContent = 'Nuevo Producto';
@@ -109,6 +114,7 @@ window.abrirModalProducto = () => {
 };
 
 window.editarProducto = (id) => {
+    origenCreacion = 'inventario';
     const p = PRODUCTOS_CACHE[id];
     document.getElementById('prod-id').value = id;
     document.getElementById('inv-codigo').value = p.codigo || '';
@@ -124,69 +130,56 @@ window.editarProducto = (id) => {
     document.getElementById('modal-producto').classList.add('active');
 };
 
+// GUARDAR PRODUCTO (MODIFICADO PARA EL FLUJO DE COMPRAS)
 document.getElementById('form-producto').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = document.getElementById('prod-id').value;
     const pA = parseFloat(document.getElementById('inv-pA').value);
+    const nombreProd = document.getElementById('inv-nombre').value;
+    const costoProd = parseFloat(document.getElementById('inv-costo').value);
     
     const dataPublica = {
-        codigo: document.getElementById('inv-codigo').value, nombre: document.getElementById('inv-nombre').value,
+        codigo: document.getElementById('inv-codigo').value, nombre: nombreProd,
         marca: document.getElementById('inv-marca').value, categoria: document.getElementById('inv-categoria').value,
         proveedor_id: document.getElementById('inv-proveedor').value,
         exento: document.getElementById('inv-exento').checked, stock: parseInt(document.getElementById('inv-stock').value)
     };
-    const dataPrecios = { costo: parseFloat(document.getElementById('inv-costo').value), precio_A: pA, precio_B: pA*0.95, precio_C: pA*0.90, precio_D: pA*0.85 };
+    const dataPrecios = { costo: costoProd, precio_A: pA, precio_B: pA*0.95, precio_C: pA*0.90, precio_D: pA*0.85 };
 
-    if (id) {
-        await updateDoc(doc(db, "catalogo", id), dataPublica);
-        await updateDoc(doc(db, "precios", id), dataPrecios);
-    } else {
-        const docRef = await addDoc(collection(db, "catalogo"), dataPublica);
-        dataPrecios.producto_id = docRef.id;
-        await setDoc(doc(db, "precios", docRef.id), dataPrecios);
+    try {
+        if (id) {
+            await updateDoc(doc(db, "catalogo", id), dataPublica);
+            await updateDoc(doc(db, "precios", id), dataPrecios);
+            Swal.fire({ title: 'Producto Actualizado', icon: 'success', timer: 1500, showConfirmButton: false });
+        } else {
+            const docRef = await addDoc(collection(db, "catalogo"), dataPublica);
+            dataPrecios.producto_id = docRef.id;
+            await setDoc(doc(db, "precios", docRef.id), dataPrecios);
+            
+            // LÓGICA NUEVA: Si venimos de una compra, lo agregamos a la compra actual
+            if (origenCreacion === 'compra') {
+                COMPRA_ITEMS.push({ id: docRef.id, nombre: nombreProd, costo: costoProd, cantidad: 1 });
+                renderCompraItems();
+                Swal.fire({ title: '¡Producto Creado y Agregado!', text: 'Puedes seguir buscando más.', icon: 'success', timer: 2000, showConfirmButton: false });
+            } else if (origenCreacion === 'manual') {
+                MANUAL_ITEMS.push({ id: docRef.id, nombre: nombreProd, codigo: dataPublica.codigo, cantidad: 1, precio_A: pA, precio_B: dataPrecios.precio_B, precio_C: dataPrecios.precio_C, precio_D: dataPrecios.precio_D, exento: dataPublica.exento, stock: dataPublica.stock });
+                renderManualItems();
+                Swal.fire({ title: '¡Producto Creado y Agregado!', icon: 'success', timer: 2000, showConfirmButton: false });
+            } else {
+                Swal.fire({ title: 'Producto Creado', icon: 'success', timer: 1500, showConfirmButton: false });
+            }
+        }
+        
+        document.getElementById('modal-producto').classList.remove('active');
+        cargarInventario(); // Recarga la caché en segundo plano
+        origenCreacion = 'inventario'; // Reset
+
+    } catch (error) {
+        Swal.fire('Error', 'No se pudo guardar el producto.', 'error');
     }
-    document.getElementById('modal-producto').classList.remove('active');
-    cargarInventario();
 });
 
-// EXPORTAR LISTAS DE PRECIOS
-window.exportarListaPrecios = (nivel, titulo) => {
-    const { jsPDF } = window.jspdf; const doc = new jsPDF();
-    
-    doc.addImage('img/logo.png', 'PNG', 14, 10, 40, 15);
-    doc.setFontSize(9); doc.setTextColor(80);
-    doc.text("R.I.F: J-50719484-1 | Telf: 0414-3549096", 196, 15, { align: "right" });
-    doc.text("Calle Caracas, Angostura del Orinoco, Ciudad Bolívar", 196, 20, { align: "right" });
-    
-    doc.setFontSize(16); doc.setTextColor(0);
-    doc.text(`LISTA DE PRECIOS - ${titulo}`, 14, 40);
-    doc.setFontSize(9); doc.text(`Fecha: ${new Date().toLocaleDateString()} | Tasa: Bs. ${TASA_BCV.toFixed(2)}`, 14, 47);
-
-    const agrupados = {};
-    Object.values(PRODUCTOS_CACHE).forEach(p => {
-        if(!agrupados[p.categoria]) agrupados[p.categoria] = [];
-        agrupados[p.categoria].push(p);
-    });
-
-    let currentY = 55;
-    Object.keys(agrupados).sort().forEach(cat => {
-        doc.setFontSize(11); doc.setFont("helvetica", "bold");
-        doc.text(cat.toUpperCase(), 14, currentY);
-        
-        const filas = agrupados[cat].map(p => [ p.codigo || '-', p.nombre || '-', `$${(p[nivel] || 0).toFixed(2)}`, `Bs. ${((p[nivel] || 0) * TASA_BCV).toFixed(2)}` ]);
-
-        doc.autoTable({
-            startY: currentY + 5, head: [["Código", "Producto", "Precio USD", "Precio Bs."]],
-            body: filas, theme: 'striped', headStyles: { fillColor: [26, 43, 76] }, styles: { fontSize: 8 },
-            margin: { left: 14, right: 14 }
-        });
-        currentY = doc.lastAutoTable.finalY + 15;
-        if (currentY > 260) { doc.addPage(); currentY = 20; }
-    });
-    doc.save(`Lista_Precios_${nivel}.pdf`);
-};
-
-// --- 2. COTIZACIONES (BUSCADOR BLINDADO) ---
+// --- 2. COTIZACIONES Y BUSCADORES ---
 async function cargarCotizaciones() {
     const tbody = document.getElementById('tbody-cotizaciones');
     const snap = await getDocs(collection(db, "cotizaciones"));
@@ -241,15 +234,16 @@ window.cambiarNivelCliente = () => {
     }
 };
 
-// BUSCADOR MANUAL BLINDADO (Usa ?. para evitar errores si falta un dato)
+// BUSCADOR MANUAL (CON OPCIÓN DE CREAR NUEVO)
 window.buscarProductoManual = (query) => {
+    buscadorActivo = 'manual';
     const q = (query || '').toLowerCase().trim(); 
     const resDiv = document.getElementById('res-manual');
     
     if (q.length < 1) { resDiv.style.display = 'none'; return; }
     
     if (Object.keys(PRODUCTOS_CACHE).length === 0) {
-        resDiv.innerHTML = '<div class="search-item" style="color:#ef4444; font-weight:bold;">⚠️ La base de datos está vacía o cargando. Ve a Inventario primero.</div>';
+        resDiv.innerHTML = '<div class="search-item" style="color:#ef4444;">Cargando base de datos... espera 2 segundos.</div>';
         resDiv.style.display = 'block'; return;
     }
     
@@ -257,15 +251,23 @@ window.buscarProductoManual = (query) => {
         const nombre = (p.nombre || '').toLowerCase();
         const codigo = (p.codigo || '').toLowerCase();
         return nombre.includes(q) || codigo.includes(q);
-    }).slice(0, 10); // Muestra hasta 10 resultados
+    }).slice(0, 10);
 
     if (matches.length > 0) {
         resDiv.innerHTML = matches.map(p => `<div class="search-item" onclick="agregarManual('${p.id}')"><strong>${p.nombre || 'Sin nombre'}</strong> - $${(p.precio_A || 0).toFixed(2)}</div>`).join('');
         resDiv.style.display = 'block';
     } else { 
-        resDiv.innerHTML = '<div class="search-item" style="color:#666;">No se encontraron productos con esa letra.</div>'; 
+        resDiv.innerHTML = `<div class="search-item btn-nuevo-producto" onclick="abrirModalNuevoProductoBuscador('${query}', 'manual')">+ Registrar nuevo producto: "${query}"</div>`; 
         resDiv.style.display = 'block'; 
     }
+};
+
+window.abrirModalNuevoProductoBuscador = (nombre, origen) => {
+    origenCreacion = origen;
+    document.getElementById('res-manual').style.display = 'none';
+    document.getElementById('res-compra').style.display = 'none';
+    abrirModalProducto(); // Llama al modal genérico
+    document.getElementById('inv-nombre').value = nombre; // Pre-llena el nombre
 };
 
 window.agregarManual = (id) => {
@@ -406,15 +408,16 @@ document.getElementById('form-proveedor').addEventListener('submit', async (e) =
     document.getElementById('form-proveedor').reset(); cargarClientesYProveedores();
 });
 
-// BUSCADOR COMPRAS BLINDADO
+// BUSCADOR COMPRAS (CON OPCIÓN DE CREAR NUEVO)
 window.buscarProductoCompra = (query) => {
+    buscadorActivo = 'compra';
     const q = (query || '').toLowerCase().trim(); 
     const resDiv = document.getElementById('res-compra');
     
     if (q.length < 1) { resDiv.style.display = 'none'; return; }
     
     if (Object.keys(PRODUCTOS_CACHE).length === 0) {
-        resDiv.innerHTML = '<div class="search-item" style="color:#ef4444; font-weight:bold;">⚠️ La base de datos está vacía o cargando.</div>';
+        resDiv.innerHTML = '<div class="search-item" style="color:#ef4444;">Cargando base de datos...</div>';
         resDiv.style.display = 'block'; return;
     }
     
@@ -428,7 +431,7 @@ window.buscarProductoCompra = (query) => {
         resDiv.innerHTML = matches.map(p => `<div class="search-item" onclick="agregarCompra('${p.id}')"><strong>${p.nombre || 'Sin nombre'}</strong> - Costo: $${(p.costo || 0).toFixed(2)}</div>`).join('');
         resDiv.style.display = 'block';
     } else { 
-        resDiv.innerHTML = '<div class="search-item" style="color:#666;">No encontrado.</div>'; 
+        resDiv.innerHTML = `<div class="search-item btn-nuevo-producto" onclick="abrirModalNuevoProductoBuscador('${query}', 'compra')">+ Registrar nuevo producto: "${query}"</div>`; 
         resDiv.style.display = 'block'; 
     }
 };
@@ -551,7 +554,6 @@ window.saldarCuenta = async (id, tipo) => {
     Swal.fire('¡Saldado!', 'La cuenta ha sido marcada como pagada.', 'success');
 };
 
-// GASTOS Y GRAFICA
 document.getElementById('form-gasto').addEventListener('submit', async (e) => {
     e.preventDefault();
     await addDoc(collection(db, "gastos"), { 
