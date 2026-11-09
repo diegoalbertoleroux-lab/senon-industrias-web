@@ -97,3 +97,20 @@ body.dark .page-title { color: white; }
   .menu-toggle { display: block !important; }
 }
 .menu-toggle { display: none; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-main); }
+/* --- DISEÑO DENSO TIPO SOFTWARE ERP --- */
+.top-menu-bar { background: var(--card-bg); border-bottom: 1px solid var(--border-color); padding: 5px 20px; display: flex; gap: 15px; font-size: 13px; font-weight: 500; color: var(--text-main); margin-bottom: 0; }
+.top-menu-item { cursor: pointer; padding: 5px 10px; border-radius: 4px; }
+.top-menu-item:hover { background: var(--input-bg); }
+
+/* Tablas más compactas */
+.table-pro th { padding: 8px 10px; font-size: 11px; }
+.table-pro td { padding: 8px 10px; font-size: 13px; }
+.card { padding: 15px; margin-bottom: 15px; }
+
+/* Ajustes al sidebar para que se vea más integrado */
+.sidebar { border-right: 1px solid var(--border-color); }
+.main-content { padding: 20px; }
+
+/* Modales más grandes para formularios pesados */
+.modal-content.lg { max-width: 800px; }
+.grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
