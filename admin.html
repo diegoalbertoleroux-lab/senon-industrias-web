@@ -4,41 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ERP | Senon Industrias</title>
-    
-    <!-- ETIQUETAS PWA -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff6b00">
-    
     <link rel="stylesheet" href="css/styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* Estilos extra para asegurar que el buscador flote por encima de todo */
+        .search-results {
+            position: absolute;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 9999;
+            width: 100%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: none;
+        }
+        .search-item {
+            padding: 10px 15px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+        }
+        .search-item:hover { background: var(--bg-body); }
+    </style>
 </head>
 <body>
 
-    <!-- LOGIN -->
     <div id="admin-login" style="display:flex; justify-content:center; align-items:center; height:100vh; width:100%;">
         <div class="card" style="width: 100%; max-width: 400px;">
             <div style="text-align:center; margin-bottom:20px;">
                 <h1 style="color:var(--accent); font-size: 32px;">SENON</h1>
-                <p style="color:var(--text-muted); font-size:14px;">Panel Administrativo</p>
             </div>
             <div id="login-msg" class="message"></div>
             <form id="form-admin-login">
                 <div class="form-group"><input type="email" id="admin-email" class="form-control" placeholder="Correo Admin" required></div>
                 <div class="form-group"><input type="password" id="admin-password" class="form-control" placeholder="Contraseña" required></div>
-                <button type="submit" class="btn btn-primary w-100">Ingresar al Sistema</button>
+                <button type="submit" class="btn btn-primary w-100">Ingresar</button>
             </form>
         </div>
     </div>
 
-    <!-- APP PRINCIPAL -->
     <div id="app-main" style="display: none;">
         <aside class="sidebar">
-            <div class="sidebar-header">
-                <img src="img/logo.png" alt="Senon">
-            </div>
+            <div class="sidebar-header"><img src="img/logo.png" alt="Senon"></div>
             <nav class="sidebar-menu">
                 <a class="menu-item active" data-view="view-dashboard">Dashboard</a>
                 <a class="menu-item" data-view="view-cotizaciones">Cotizaciones</a>
@@ -49,9 +62,7 @@
                 <a class="menu-item" data-view="view-servicio">Servicio Técnico</a>
                 <a class="menu-item" data-view="view-cuentas">Cuentas CxC / CxP</a>
             </nav>
-            <div class="sidebar-footer">
-                <button id="btn-logout" class="btn btn-outline w-100" style="color:#ef4444; border-color:#ef4444;">Cerrar Sesión</button>
-            </div>
+            <div class="sidebar-footer"><button id="btn-logout" class="btn btn-outline w-100" style="color:#ef4444; border-color:#ef4444;">Cerrar Sesión</button></div>
         </aside>
 
         <main class="main-content">
@@ -63,7 +74,7 @@
                 <div class="tasa-display" id="tasa-display">Tasa BCV: Cargando...</div>
             </header>
 
-            <!-- DASHBOARD -->
+            <!-- DASHBOARD CON GASTOS -->
             <section id="view-dashboard" class="view-section active">
                 <div class="grid-3">
                     <div class="card">
@@ -79,9 +90,19 @@
                         <h2 style="font-size:32px; color: #10b981;" id="dash-cobrar">$0.00</h2>
                     </div>
                 </div>
-                <div class="card">
-                    <h3>Resumen Gráfico</h3>
-                    <canvas id="chart-dashboard" height="80"></canvas>
+                <div class="grid-2">
+                    <div class="card">
+                        <h3>Resumen Gráfico</h3>
+                        <canvas id="chart-dashboard" height="150"></canvas>
+                    </div>
+                    <div class="card">
+                        <h3>Registrar Gasto Operativo</h3>
+                        <form id="form-gasto">
+                            <div class="form-group"><label>Concepto</label><input type="text" id="gasto-desc" class="form-control" required></div>
+                            <div class="form-group"><label>Monto (USD)</label><input type="number" step="0.01" id="gasto-monto" class="form-control" required></div>
+                            <button type="submit" class="btn btn-primary w-100">Registrar Egreso</button>
+                        </form>
+                    </div>
                 </div>
             </section>
 
@@ -173,8 +194,9 @@
                             <div class="form-group"><label>Proveedor</label><select id="compra-proveedor" class="form-control"></select></div>
                             <div class="form-group" style="position:relative;">
                                 <label>Buscar Producto</label>
-                                <input type="text" id="compra-buscar-prod" class="form-control" placeholder="Escriba nombre o código..." autocomplete="off">
-                                <div id="res-compra" style="background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; display:none; max-height:200px; overflow-y:auto; position:absolute; z-index:999; width:100%;"></div>
+                                <!-- AQUI ESTA EL TRUCO: oninput directo en el HTML -->
+                                <input type="text" id="compra-buscar-prod" class="form-control" placeholder="Escriba nombre o código..." autocomplete="off" oninput="buscarProductoCompra(this.value)">
+                                <div id="res-compra" class="search-results"></div>
                             </div>
                             <div id="lista-compra" style="margin-bottom:15px;"></div>
                             <div class="form-group" style="display:flex; align-items:center; gap:10px;">
@@ -289,8 +311,9 @@
             </div>
             <div class="form-group" style="position:relative;">
                 <label>Buscar Producto</label>
-                <input type="text" id="manual-buscar" class="form-control" placeholder="Escriba nombre..." autocomplete="off">
-                <div id="res-manual" style="background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; display:none; max-height:200px; overflow-y:auto; position:absolute; z-index:999; width:100%;"></div>
+                <!-- AQUI ESTA EL TRUCO: oninput directo en el HTML -->
+                <input type="text" id="manual-buscar" class="form-control" placeholder="Escriba nombre..." autocomplete="off" oninput="buscarProductoManual(this.value)">
+                <div id="res-manual" class="search-results"></div>
             </div>
             <div id="manual-lista" style="margin-bottom:15px; background:var(--bg-body); padding:15px; border-radius:8px;"></div>
             <div class="grid-2">
@@ -309,6 +332,7 @@
         </div>
     </div>
 
+    <!-- MODAL REPARACION CON CAMPOS EXTRA -->
     <div class="modal-overlay" id="modal-reparacion">
         <div class="modal-content">
             <button class="close-modal" onclick="document.getElementById('modal-reparacion').classList.remove('active')">×</button>
@@ -316,7 +340,9 @@
             <form id="form-reparacion-manual">
                 <div class="form-group"><label>Cliente</label><input type="text" id="rep-cliente" class="form-control" required></div>
                 <div class="form-group"><label>Equipo</label><input type="text" id="rep-equipo" class="form-control" required></div>
-                <div class="form-group"><label>Falla</label><textarea id="rep-falla" class="form-control" required></textarea></div>
+                <div class="form-group"><label>Falla Reportada</label><textarea id="rep-falla" class="form-control" rows="2" required></textarea></div>
+                <div class="form-group"><label>Actividades Realizadas (Para el PDF)</label><textarea id="rep-actividades" class="form-control" rows="3"></textarea></div>
+                <div class="form-group"><label>Observaciones (Para el PDF)</label><textarea id="rep-observaciones" class="form-control" rows="2"></textarea></div>
                 <button type="submit" class="btn btn-primary w-100">Registrar</button>
             </form>
         </div>
@@ -340,11 +366,7 @@
 
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').then(function(registration) {
-                console.log('Service Worker registrado con éxito:', registration.scope);
-            }).catch(function(error) {
-                console.log('Fallo al registrar el Service Worker:', error);
-            });
+            navigator.serviceWorker.register('/sw.js');
         }
     </script>
     <script type="module" src="js/admin.js"></script>
