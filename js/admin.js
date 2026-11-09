@@ -1,6 +1,6 @@
 import { auth, db } from './firebase-config.js';
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { collection, addDoc, getDocs, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, addDoc, getDocs, doc, setDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const ADMIN_EMAIL = "diegoalbertoleroux@gmail.com"; // ⚠️ VERIFICA TU CORREO
 let TASA_BCV = 36.50;
@@ -92,7 +92,8 @@ window.filtrarInventario = () => {
             tbody.innerHTML += `
                 <tr>
                     <td>${p.codigo || '-'}</td><td>${p.nombre}</td><td>${p.proveedor || '-'}</td>
-                    <td>${p.stock || 0}</td><td>$${(p.precio_A || 0).toFixed(2)}</td>
+                    <td style="color: ${p.stock <= 5 ? '#ef4444' : 'inherit'}; font-weight: ${p.stock <= 5 ? 'bold' : 'normal'};">${p.stock || 0}</td>
+                    <td>$${(p.precio_A || 0).toFixed(2)}</td>
                     <td><button class="btn btn-outline btn-sm" onclick="editarProducto('${p.id}')">Editar</button></td>
                 </tr>`;
         }
@@ -147,16 +148,51 @@ document.getElementById('form-producto').addEventListener('submit', async (e) =>
     cargarInventario();
 });
 
-// EXPORTAR LISTA DE PRECIOS
-window.exportarListaPrecios = () => {
+// EXPORTAR LISTAS DE PRECIOS AGRUPADAS
+window.exportarListaPrecios = (nivel, titulo) => {
     const { jsPDF } = window.jspdf; const doc = new jsPDF();
-    doc.text("LISTA DE PRECIOS - SENON INDUSTRIAS", 14, 20);
-    const filas = Object.values(PRODUCTOS_CACHE).map(p => [p.codigo || '-', p.nombre, p.categoria, `$${p.precio_A.toFixed(2)}`]);
-    doc.autoTable({ startY: 30, head: [["Código", "Producto", "Categoría", "Precio A (USD)"]], body: filas });
-    doc.save("Lista_Precios.pdf");
+    
+    // Encabezado
+    doc.addImage('img/logo.png', 'PNG', 14, 10, 40, 15);
+    doc.setFontSize(10); doc.setTextColor(100);
+    doc.text("R.I.F: J-50719484-1 | Telf: 0414-3549096", 150, 15);
+    doc.setFontSize(16); doc.setTextColor(0);
+    doc.text(`LISTA DE PRECIOS - ${titulo}`, 14, 35);
+    doc.setFontSize(9); doc.text(`Fecha: ${new Date().toLocaleDateString()}  |  Tasa: Bs. ${TASA_BCV.toFixed(2)}`, 14, 42);
+
+    // Agrupar por categoría
+    const agrupados = {};
+    Object.values(PRODUCTOS_CACHE).forEach(p => {
+        if(!agrupados[p.categoria]) agrupados[p.categoria] = [];
+        agrupados[p.categoria].push(p);
+    });
+
+    let currentY = 50;
+    Object.keys(agrupados).sort().forEach(cat => {
+        doc.setFontSize(11); doc.setFont("helvetica", "bold");
+        doc.text(cat.toUpperCase(), 14, currentY);
+        
+        const filas = agrupados[cat].map(p => [
+            p.codigo || '-', p.nombre, `$${p[nivel].toFixed(2)}`, `Bs. ${(p[nivel] * TASA_BCV).toFixed(2)}`
+        ]);
+
+        doc.autoTable({
+            startY: currentY + 5,
+            head: [["Código", "Producto", "Precio USD", "Precio Bs."]],
+            body: filas,
+            theme: 'striped',
+            headStyles: { fillColor: [26, 43, 76] },
+            styles: { fontSize: 8 },
+            margin: { left: 14, right: 14 }
+        });
+        currentY = doc.lastAutoTable.finalY + 15;
+        if (currentY > 260) { doc.addPage(); currentY = 20; }
+    });
+
+    doc.save(`Lista_Precios_${nivel}.pdf`);
 };
 
-// --- 2. COTIZACIONES WEB Y MANUALES ---
+// --- 2. COTIZACIONES (CON DESCUENTO DE STOCK) ---
 async function cargarCotizaciones() {
     const tbody = document.getElementById('tbody-cotizaciones');
     const snap = await getDocs(collection(db, "cotizaciones"));
@@ -165,14 +201,11 @@ async function cargarCotizaciones() {
         const c = d.data();
         let btn = '';
         if (c.estado === 'pendiente') btn = `<button class="btn btn-primary btn-sm" onclick="abrirCotizar('${d.id}', '${encodeURIComponent(JSON.stringify(c))}')">Procesar</button>`;
-        else if (c.estado === 'aprobada') btn = `<button class="btn btn-outline btn-sm" onclick="generarPDF('${encodeURIComponent(JSON.stringify(c))}', 'COTIZACIÓN')">PDF</button>
-                                                  <button class="btn btn-primary btn-sm" onclick="generarPDF('${encodeURIComponent(JSON.stringify(c))}', 'FACTURA')">Facturar</button>`;
-        
-        tbody.innerHTML += `
-            <tr>
-                <td>${new Date(c.fecha.seconds*1000).toLocaleDateString()}</td><td>${c.email}</td>
-                <td><span class="badge">${c.estado}</span></td><td>${btn}</td>
-            </tr>`;
+        else if (c.estado === 'aprobada' || c.estado === 'facturada') {
+            btn = `<button class="btn btn-outline btn-sm" onclick="generarPDF('${encodeURIComponent(JSON.stringify(c))}', 'COTIZACIÓN')">Cotización</button>
+                   <button class="btn btn-primary btn-sm" onclick="generarPDF('${encodeURIComponent(JSON.stringify(c))}', 'FACTURA')">Factura</button>`;
+        }
+        tbody.innerHTML += `<tr><td>${new Date(c.fecha.seconds*1000).toLocaleDateString()}</td><td>${c.email}</td><td><span class="badge">${c.estado}</span></td><td>${btn}</td></tr>`;
     });
 }
 
@@ -185,25 +218,43 @@ window.abrirCotizar = (id, str) => {
 window.guardarCotizacionWeb = async () => {
     const nivel = document.getElementById('cotizar-nivel').value;
     let total = 0; let prods = [];
+    
     for (let p of COTIZACION_WEB_ACTUAL.productos) {
         const pr = PRODUCTOS_CACHE[p.id]; 
         let precioU = pr ? pr[nivel] : 0;
         total += precioU * p.cantidad;
         prods.push({ ...p, precio_unitario: precioU, subtotal: precioU * p.cantidad, codigo: pr ? pr.codigo : 'N/A', exento: pr ? pr.exento : false });
+        
+        // DESCONTAR STOCK AUTOMÁTICAMENTE
+        if (pr) {
+            const nuevoStock = Math.max(0, (pr.stock || 0) - p.cantidad);
+            await updateDoc(doc(db, "catalogo", p.id), { stock: nuevoStock });
+        }
     }
+    
     await updateDoc(doc(db, "cotizaciones", COTIZACION_WEB_ACTUAL.id), { estado: "aprobada", total_usd: total, productos_con_precio: prods });
     await addDoc(collection(db, "cxc"), { cliente_email: COTIZACION_WEB_ACTUAL.email, monto: total, estado: "pendiente", fecha: new Date() });
+    
     document.getElementById('modal-cotizar').classList.remove('active');
-    cargarCotizaciones(); cargarVentas(); cargarCuentas(); cargarGrafica();
+    cargarCotizaciones(); cargarVentas(); cargarCuentas(); cargarGrafica(); cargarInventario();
+    Swal.fire('Aprobada', 'Stock descontado correctamente', 'success');
 };
 
-// COTIZACIÓN MANUAL
+// --- COTIZACIÓN MANUAL ---
 window.abrirModalCotizacionManual = () => {
     const select = document.getElementById('manual-cot-cliente');
     select.innerHTML = '<option value="">Seleccione un cliente...</option>';
     Object.keys(CLIENTES_CACHE).forEach(id => { select.innerHTML += `<option value="${id}">${CLIENTES_CACHE[id].nombre_laboratorio}</option>`; });
     MANUAL_ITEMS = []; renderManualItems();
     document.getElementById('modal-cotizacion-manual').classList.add('active');
+};
+
+window.cambiarNivelCliente = () => {
+    const id = document.getElementById('manual-cot-cliente').value;
+    if(id && CLIENTES_CACHE[id] && CLIENTES_CACHE[id].nivel_precio) {
+        document.getElementById('manual-nivel').value = CLIENTES_CACHE[id].nivel_precio;
+        renderManualItems();
+    }
 };
 
 document.getElementById('manual-buscar').addEventListener('input', (e) => {
@@ -217,7 +268,7 @@ document.getElementById('manual-buscar').addEventListener('input', (e) => {
 });
 
 window.agregarManual = (id) => {
-    const p = PRODUCTOS_CACHE[id]; MANUAL_ITEMS.push({ id, nombre: p.nombre, codigo: p.codigo, cantidad: 1, precio_A: p.precio_A, precio_B: p.precio_B, precio_C: p.precio_C, precio_D: p.precio_D, exento: p.exento });
+    const p = PRODUCTOS_CACHE[id]; MANUAL_ITEMS.push({ id, nombre: p.nombre, codigo: p.codigo, cantidad: 1, precio_A: p.precio_A, precio_B: p.precio_B, precio_C: p.precio_C, precio_D: p.precio_D, exento: p.exento, stock: p.stock });
     document.getElementById('res-manual').style.display = 'none'; document.getElementById('manual-buscar').value = ''; renderManualItems();
 };
 window.quitarManual = (i) => { MANUAL_ITEMS.splice(i, 1); renderManualItems(); };
@@ -239,19 +290,31 @@ window.guardarCotizacionManual = async () => {
     if (!clienteId || MANUAL_ITEMS.length === 0) return Swal.fire('Error', 'Faltan datos', 'error');
     const cliente = CLIENTES_CACHE[clienteId];
     let total = 0; let prods = [];
+    
     MANUAL_ITEMS.forEach(item => {
         const nivel = document.getElementById('manual-nivel').value;
         const precioU = item[nivel] || 0; total += precioU * item.cantidad;
         prods.push({ id: item.id, nombre: item.nombre, codigo: item.codigo, cantidad: item.cantidad, precio_unitario: precioU, subtotal: precioU * item.cantidad, exento: item.exento });
     });
+    
+    // Restar Stock
+    for (let item of MANUAL_ITEMS) {
+        const p = PRODUCTOS_CACHE[item.id];
+        if(p) {
+            const nuevoStock = Math.max(0, (p.stock || 0) - item.cantidad);
+            await updateDoc(doc(db, "catalogo", item.id), { stock: nuevoStock });
+        }
+    }
+
     await addDoc(collection(db, "cotizaciones"), { cliente_id: clienteId, email: cliente.email, estado: "aprobada", total_usd: total, productos_con_precio: prods, fecha: new Date(), es_manual: true });
     await addDoc(collection(db, "cxc"), { cliente_email: cliente.email, monto: total, estado: "pendiente", fecha: new Date() });
+    
     document.getElementById('modal-cotizacion-manual').classList.remove('active');
-    cargarCotizaciones(); cargarVentas(); cargarCuentas(); cargarGrafica();
-    Swal.fire('¡Éxito!', 'Cotización manual creada', 'success');
+    cargarCotizaciones(); cargarVentas(); cargarCuentas(); cargarGrafica(); cargarInventario();
+    Swal.fire('¡Éxito!', 'Cotización manual creada y stock descontado', 'success');
 };
 
-// --- 3. VENTAS Y PDFs ---
+// --- 3. VENTAS Y PDFs (CON DISEÑO Y MEMBRETE) ---
 async function cargarVentas() {
     const tbody = document.getElementById('tbody-ventas'); const snap = await getDocs(collection(db, "cotizaciones"));
     tbody.innerHTML = ''; let tot = 0;
@@ -268,27 +331,62 @@ async function cargarVentas() {
 window.generarPDF = (str, tipo) => {
     const c = JSON.parse(decodeURIComponent(str));
     const { jsPDF } = window.jspdf; const doc = new jsPDF();
-    doc.text(`SENON INDUSTRIAS - ${tipo}`, 14, 20); doc.text(`Cliente: ${c.email}`, 14, 30);
+    
+    // Encabezado Empresa
+    doc.addImage('img/logo.png', 'PNG', 14, 10, 35, 15);
+    doc.setFontSize(10); doc.setTextColor(80);
+    doc.text("Calle Caracas cruce con callejón sin nombre, Edif. Primer Piso, Of. 1", 14, 30);
+    doc.text("Barrio El Merecure, Angostura del Orinoco, Ciudad Bolívar", 14, 35);
+    doc.text("R.I.F: J-50719484-1 | Telf: 0414-3549096", 14, 40);
+    
+    doc.setFontSize(16); doc.setTextColor(0);
+    doc.text(tipo, 14, 55);
+    
+    // Datos Cliente
+    doc.setFontSize(10); doc.setFont("helvetica", "normal");
+    doc.text(`CLIENTE: ${c.email.split('@')[0].toUpperCase()}`, 14, 65);
+    doc.text(`FECHA: ${new Date().toLocaleDateString()}`, 150, 65);
+    
     let base = 0; let exento = 0;
     const filas = c.productos_con_precio.map(p => {
         if(p.exento) exento += p.subtotal; else base += p.subtotal;
-        return [p.cantidad, p.nombre, `$${p.precio_unitario.toFixed(2)}`, `$${p.subtotal.toFixed(2)}`];
+        return [p.cantidad, p.nombre, p.codigo || '-', `$${p.precio_unitario.toFixed(2)}`, `$${p.subtotal.toFixed(2)}`];
     });
-    doc.autoTable({ startY: 40, head: [["Cant", "Producto", "Precio", "Total"]], body: filas });
+
+    doc.autoTable({
+        startY: 75,
+        head: [["CANT.", "DESCRIPCIÓN", "SKU", "PRECIO USD", "TOTAL USD"]],
+        body: filas,
+        theme: 'grid',
+        headStyles: { fillColor: [26, 43, 76], textColor: [255,255,255] },
+        styles: { fontSize: 9 }
+    });
+
     let y = doc.lastAutoTable.finalY + 10;
+    doc.setFont("helvetica", "bold");
+    
     if(tipo === 'FACTURA') {
         const iva = base * 0.16;
+        const totalFactura = base + exento + iva;
         doc.text(`Base Imponible: $${base.toFixed(2)}`, 130, y);
-        doc.text(`Exento: $${exento.toFixed(2)}`, 130, y+6);
+        doc.text(`Monto Exento: $${exento.toFixed(2)}`, 130, y+6);
         doc.text(`IVA (16%): $${iva.toFixed(2)}`, 130, y+12);
-        doc.text(`TOTAL: $${(base+exento+iva).toFixed(2)}`, 130, y+20);
+        doc.setFontSize(12);
+        doc.text(`TOTAL FACTURA: $${totalFactura.toFixed(2)}`, 130, y+22);
+        doc.text(`TOTAL Bs: Bs. ${(totalFactura * TASA_BCV).toFixed(2)}`, 130, y+28);
     } else {
-        doc.text(`TOTAL: $${c.total_usd.toFixed(2)}`, 130, y);
+        doc.text(`SUBTOTAL USD: $${c.total_usd.toFixed(2)}`, 130, y);
+        doc.setFontSize(12);
+        doc.text(`TOTAL Bs: Bs. ${(c.total_usd * TASA_BCV).toFixed(2)}`, 130, y+8);
     }
-    doc.save(`${tipo}.pdf`);
+
+    doc.setFontSize(9); doc.setTextColor(150);
+    doc.text("Observaciones: Esta cotización tiene una validez de 15 días.", 14, y + 40);
+    
+    doc.save(`${tipo}_${c.email.split('@')[0]}.pdf`);
 };
 
-// --- 4. PROVEEDORES Y COMPRAS CON BUSCADOR ---
+// --- 4. PROVEEDORES Y COMPRAS ---
 async function cargarClientesYProveedores() {
     const snapC = await getDocs(collection(db, "usuarios"));
     const tbodyC = document.getElementById('tbody-clientes'); tbodyC.innerHTML = ''; CLIENTES_CACHE = {};
@@ -313,8 +411,13 @@ async function cargarClientesYProveedores() {
 document.getElementById('form-cliente-manual').addEventListener('submit', async (e) => {
     e.preventDefault();
     await addDoc(collection(db, "usuarios"), {
-        nombre_laboratorio: document.getElementById('cli-lab').value, rif: document.getElementById('cli-rif').value,
-        nombre_contacto: document.getElementById('cli-contacto').value, email: document.getElementById('cli-email').value, estado: 'aprobado'
+        nombre_laboratorio: document.getElementById('cli-lab').value || 'Sin Nombre', 
+        rif: document.getElementById('cli-rif').value,
+        nombre_contacto: document.getElementById('cli-contacto').value, 
+        direccion: document.getElementById('cli-direccion').value,
+        email: document.getElementById('cli-email').value, 
+        nivel_precio: document.getElementById('cli-nivel').value,
+        estado: 'aprobado'
     });
     document.getElementById('modal-cliente').classList.remove('active');
     document.getElementById('form-cliente-manual').reset();
@@ -362,8 +465,17 @@ document.getElementById('form-compra').addEventListener('submit', async (e) => {
     await addDoc(collection(db, "compras"), { proveedor_id: document.getElementById('compra-proveedor').value, items: COMPRA_ITEMS, monto: total, pagada, conIva, fecha: new Date() });
     if (!pagada) await addDoc(collection(db, "cxp"), { proveedor_id: document.getElementById('compra-proveedor').value, monto: total, estado: "pendiente", fecha: new Date() });
     
-    COMPRA_ITEMS = []; document.getElementById('form-compra').reset(); renderCompraItems(); cargarCuentas();
-    Swal.fire({ title: '¡Compra Registrada!', icon: 'success', timer: 2000, showConfirmButton: false });
+    // Sumar stock
+    for (let item of COMPRA_ITEMS) {
+        const p = PRODUCTOS_CACHE[item.id];
+        if(p) {
+            const nuevoStock = (p.stock || 0) + item.cantidad;
+            await updateDoc(doc(db, "catalogo", item.id), { stock: nuevoStock });
+        }
+    }
+
+    COMPRA_ITEMS = []; document.getElementById('form-compra').reset(); renderCompraItems(); cargarCuentas(); cargarInventario();
+    Swal.fire({ title: '¡Compra Registrada!', text: 'Stock sumado correctamente.', icon: 'success', timer: 2000, showConfirmButton: false });
 });
 
 // --- 5. SERVICIO TÉCNICO ---
@@ -385,9 +497,22 @@ async function cargarServicios() {
 window.generarInformeTecnico = (str) => {
     const t = JSON.parse(decodeURIComponent(str));
     const { jsPDF } = window.jspdf; const doc = new jsPDF();
-    doc.text("INFORME DE SERVICIO TECNICO - SENON INDUSTRIAS", 14, 20);
-    doc.text(`Cliente: ${t.cliente}`, 14, 40); doc.text(`Equipo: ${t.equipo}`, 14, 50);
-    doc.text(`Falla Reportada:`, 14, 60); doc.text(t.falla, 14, 66, { maxWidth: 180 });
+    
+    // Encabezado
+    doc.addImage('img/logo.png', 'PNG', 14, 10, 35, 15);
+    doc.setFontSize(10); doc.setTextColor(80);
+    doc.text("R.I.F: J-50719484-1 | Telf: 0414-3549096", 14, 30);
+    doc.text("Angostura del Orinoco, Ciudad Bolívar", 14, 35);
+
+    doc.setFontSize(16); doc.setTextColor(0);
+    doc.text("INFORME DE SERVICIO TÉCNICO", 14, 50);
+    
+    doc.setFontSize(10);
+    doc.text(`Cliente: ${t.cliente}`, 14, 65); 
+    doc.text(`Equipo: ${t.equipo}`, 14, 75);
+    doc.text(`Falla Reportada:`, 14, 85); 
+    doc.text(t.falla, 14, 91, { maxWidth: 180 });
+    
     doc.save("Informe_Tecnico.pdf");
 };
 
@@ -396,25 +521,35 @@ async function cargarCuentas() {
     const cxc = await getDocs(collection(db, "cxc")); const tCxc = document.getElementById('tbody-cxc'); tCxc.innerHTML = '';
     let totalCobrar = 0;
     cxc.forEach(d => { 
-        const m = d.data().monto || 0; totalCobrar += m;
-        tCxc.innerHTML += `<tr><td>${d.data().cliente_email || 'Cliente'}</td><td>$${m.toFixed(2)}</td><td><span class="badge">${d.data().estado}</span></td></tr>`; 
+        const m = d.data().monto || 0;
+        if(d.data().estado === 'pendiente') {
+            totalCobrar += m;
+            tCxc.innerHTML += `<tr><td>${d.data().cliente_email || 'Cliente'}</td><td>$${m.toFixed(2)}</td><td><span class="badge" style="background:#fef3c7; color:#b45309;">Pendiente</span></td><td><button class="btn btn-success btn-sm" onclick="saldarCuenta('${d.id}', 'cxc')">Cobrar</button></td></tr>`; 
+        }
     });
     if(document.getElementById('dash-cobrar')) document.getElementById('dash-cobrar').textContent = `$${totalCobrar.toFixed(2)}`;
 
     const cxp = await getDocs(collection(db, "cxp")); const tCxp = document.getElementById('tbody-cxp'); tCxp.innerHTML = '';
     cxp.forEach(d => { 
         const m = d.data().monto || 0;
-        const prov = PROVEEDORES_CACHE[d.data().proveedor_id]?.nombre || 'Proveedor';
-        tCxp.innerHTML += `<tr><td>${prov}</td><td>$${m.toFixed(2)}</td><td><span class="badge">${d.data().estado}</span></td></tr>`; 
+        if(d.data().estado === 'pendiente') {
+            const prov = PROVEEDORES_CACHE[d.data().proveedor_id]?.nombre || 'Proveedor';
+            tCxp.innerHTML += `<tr><td>${prov}</td><td>$${m.toFixed(2)}</td><td><span class="badge" style="background:#fef3c7; color:#b45309;">Pendiente</span></td><td><button class="btn btn-success btn-sm" onclick="saldarCuenta('${d.id}', 'cxp')">Pagar</button></td></tr>`; 
+        }
     });
 }
 
+window.saldarCuenta = async (id, tipo) => {
+    await updateDoc(doc(db, tipo, id), { estado: "pagado" });
+    cargarCuentas();
+    Swal.fire('¡Saldado!', 'La cuenta ha sido marcada como pagada.', 'success');
+};
+
 async function cargarGrafica() {
     const snap = await getDocs(collection(db, "cotizaciones"));
-    let ventas = [0,0,0,0,0,0,0]; // Lunes a Domingo
+    let ventas = [0,0,0,0,0,0,0];
     snap.forEach(d => {
         if(d.data().estado === 'aprobada') {
-            // Simulamos agrupación por días de la semana
             const dia = new Date(d.data().fecha.seconds * 1000).getDay(); 
             ventas[dia] += d.data().total_usd;
         }
