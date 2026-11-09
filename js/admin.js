@@ -10,7 +10,7 @@ const loginMsg = document.getElementById('login-msg');
 
 // ⚠️ IMPORTANTE: Pon aquí el correo EXACTO que creaste en Firebase Authentication
 // Ejemplo: "diegoalbertoleroux@gmail.com"
-const ADMIN_EMAIL = "TU_CORREO_AQUI@gmail.com"; 
+const ADMIN_EMAIL = "diegoalbertoleroux@gmail.com"; 
 
 formLogin.addEventListener('submit', async (e) => {
     e.preventDefault();
