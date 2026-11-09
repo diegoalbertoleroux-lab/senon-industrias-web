@@ -1,0 +1,195 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700&display=swap');
+
+:root {
+  /* Modo Claro (Por defecto) */
+  --bg-color: #f8fafc;
+  --card-bg: #ffffff;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --primary: #e86a24; /* Naranja Senon */
+  --primary-hover: #d65b18;
+  --secondary: #1a2b4c; /* Azul Marino Senon */
+  --border-color: #e2e8f0;
+  --input-bg: #f8fafc;
+  --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+}
+
+body.dark {
+  /* Modo Oscuro */
+  --bg-color: #0f172a;
+  --card-bg: #1e293b;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+  --input-bg: #0f172a;
+  --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+h1, h2, h3 {
+  font-family: 'Outfit', sans-serif;
+  color: var(--secondary);
+}
+
+body.dark h1, body.dark h2, body.dark h3 {
+  color: var(--text-main);
+}
+
+/* Botón de modo oscuro */
+.theme-toggle {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 10px;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+.theme-toggle:hover { transform: scale(1.1); }
+.theme-toggle svg { width: 20px; height: 20px; }
+
+/* Contenedor Principal (Login/Registro) */
+.auth-container {
+  width: 100%;
+  max-width: 450px;
+  padding: 20px;
+}
+
+.auth-card {
+  background-color: var(--card-bg);
+  padding: 40px 30px;
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border-color);
+}
+
+.logo-container {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.logo-text {
+  font-family: 'Outfit', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 1px;
+}
+
+.logo-subtext {
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* Pestañas (Login / Registro) */
+.tabs {
+  display: flex;
+  margin-bottom: 25px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tab {
+  flex: 1;
+  padding: 10px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+/* Formularios */
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 5px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.form-control {
+  width: 100%;
+  padding: 12px;
+  background-color: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-main);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 14px;
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-top: 10px;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+.form-section { display: none; }
+.form-section.active { display: block; }
+
+.message {
+  font-size: 13px;
+  text-align: center;
+  margin-top: 15px;
+  padding: 10px;
+  border-radius: 8px;
+  display: none;
+}
+.message.error { background-color: #fee2e2; color: #991b1b; display: block; }
+.message.success { background-color: #dcfce7; color: #166534; display: block; }
