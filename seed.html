@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Cargando Productos...</title>
+    <style>body { font-family: sans-serif; text-align: center; padding: 50px; }</style>
+</head>
+<body>
+    <h1>Carga Masiva de Inventario</h1>
+    <p>Haz clic en el botón para subir los productos del PDF a Firebase.</p>
+    <button id="btn-seed" style="padding: 15px 30px; font-size: 18px; background: #e86a24; color: white; border: none; border-radius: 8px; cursor: pointer;">Subir Productos</button>
+    <h3 id="status" style="color: #10b981; margin-top: 20px;"></h3>
+
+    <script type="module">
+        import { db } from './js/firebase-config.js';
+        import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { seedProducts } from './js/seed-data.js';
+
+        document.getElementById('btn-seed').addEventListener('click', async () => {
+            const btn = document.getElementById('btn-seed');
+            const status = document.getElementById('status');
+            btn.disabled = true;
+            
+            for (let i = 0; i < seedProducts.length; i++) {
+                const p = seedProducts[i];
+                status.innerText = `Subiendo ${i+1} de ${seedProducts.length}: ${p.nombre}`;
+                
+                // Cálculo automático: B (-5%), C (-10%), D (-15%)
+                const pB = p.precio_A * 0.95;
+                const pC = p.precio_A * 0.90;
+                const pD = p.precio_A * 0.85;
+
+                try {
+                    // 1. Guardar info pública
+                    const docRef = await addDoc(collection(db, "catalogo"), {
+                        codigo: p.codigo, nombre: p.nombre, marca: p.marca,
+                        categoria: p.categoria, descripcion: "", exento: false
+                    });
+                    // 2. Guardar precios privados
+                    await addDoc(collection(db, "precios"), {
+                        producto_id: docRef.id, costo: 0,
+                        precio_A: p.precio_A, precio_B: pB, precio_C: pC, precio_D: pD
+                    });
+                } catch (e) {
+                    console.error("Error con " + p.nombre, e);
+                }
+            }
+            status.innerText = "¡Todos los productos han sido cargados exitosamente!";
+            btn.style.display = 'none';
+        });
+    </script>
+</body>
+</html>
