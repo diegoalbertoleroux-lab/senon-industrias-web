@@ -17,6 +17,7 @@
 </head>
 <body>
 
+    <!-- LOGIN -->
     <div id="admin-login" style="display:flex; justify-content:center; align-items:center; height:100vh; width:100%;">
         <div class="card" style="width: 100%; max-width: 400px;">
             <div style="text-align:center; margin-bottom:20px;">
@@ -32,6 +33,7 @@
         </div>
     </div>
 
+    <!-- APP PRINCIPAL -->
     <div id="app-main" style="display: none;">
         <aside class="sidebar">
             <div class="sidebar-header">
@@ -117,11 +119,14 @@
                 <div class="card">
                     <div class="card-header">
                         <h2>Inventario General</h2>
-                        <div style="display:flex; gap:10px;">
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
                             <select id="filtro-categoria-inv" class="form-control" style="width:150px;" onchange="filtrarInventario()">
                                 <option value="">Categorías</option>
                             </select>
-                            <button class="btn btn-outline btn-sm" onclick="exportarListaPrecios()">Exportar Lista</button>
+                            <button class="btn btn-outline btn-sm" onclick="exportarListaPrecios('precio_A', 'Lista A (Base)')">PDF Lista A</button>
+                            <button class="btn btn-outline btn-sm" onclick="exportarListaPrecios('precio_B', 'Lista B (-5%)')">PDF Lista B</button>
+                            <button class="btn btn-outline btn-sm" onclick="exportarListaPrecios('precio_C', 'Lista C (-10%)')">PDF Lista C</button>
+                            <button class="btn btn-outline btn-sm" onclick="exportarListaPrecios('precio_D', 'Lista D (-15%)')">PDF Lista D</button>
                             <button class="btn btn-primary btn-sm" onclick="abrirModalProducto()">+ Nuevo Producto</button>
                         </div>
                     </div>
@@ -208,11 +213,11 @@
                 <div class="grid-2">
                     <div class="card">
                         <h2>Cuentas por Cobrar</h2>
-                        <div class="table-responsive"><table class="table-pro"><thead><tr><th>Cliente</th><th>Monto</th><th>Estado</th></tr></thead><tbody id="tbody-cxc"></tbody></table></div>
+                        <div class="table-responsive"><table class="table-pro"><thead><tr><th>Cliente</th><th>Monto</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="tbody-cxc"></tbody></table></div>
                     </div>
                     <div class="card">
                         <h2>Cuentas por Pagar</h2>
-                        <div class="table-responsive"><table class="table-pro"><thead><tr><th>Proveedor</th><th>Monto</th><th>Estado</th></tr></thead><tbody id="tbody-cxp"></tbody></table></div>
+                        <div class="table-responsive"><table class="table-pro"><thead><tr><th>Proveedor</th><th>Monto</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="tbody-cxp"></tbody></table></div>
                     </div>
                 </div>
             </section>
@@ -225,10 +230,20 @@
             <button class="close-modal" onclick="document.getElementById('modal-cliente').classList.remove('active')">×</button>
             <h2>Nuevo Cliente</h2>
             <form id="form-cliente-manual">
-                <div class="form-group"><label>Laboratorio</label><input type="text" id="cli-lab" class="form-control" required></div>
-                <div class="form-group"><label>RIF</label><input type="text" id="cli-rif" class="form-control" required></div>
-                <div class="form-group"><label>Contacto</label><input type="text" id="cli-contacto" class="form-control" required></div>
-                <div class="form-group"><label>Email</label><input type="email" id="cli-email" class="form-control" required></div>
+                <div class="form-group"><label>Laboratorio</label><input type="text" id="cli-lab" class="form-control"></div>
+                <div class="form-group"><label>RIF</label><input type="text" id="cli-rif" class="form-control"></div>
+                <div class="form-group"><label>Contacto</label><input type="text" id="cli-contacto" class="form-control"></div>
+                <div class="form-group"><label>Dirección</label><input type="text" id="cli-direccion" class="form-control"></div>
+                <div class="form-group"><label>Email</label><input type="email" id="cli-email" class="form-control"></div>
+                <div class="form-group">
+                    <label>Nivel de Precio por Defecto</label>
+                    <select id="cli-nivel" class="form-control">
+                        <option value="precio_A">Nivel A (Base)</option>
+                        <option value="precio_B">Nivel B (-5%)</option>
+                        <option value="precio_C">Nivel C (-10%)</option>
+                        <option value="precio_D">Nivel D (-15%)</option>
+                    </select>
+                </div>
                 <button type="submit" class="btn btn-primary w-100">Guardar Cliente</button>
             </form>
         </div>
@@ -270,7 +285,7 @@
             <h2>Crear Cotización Manual</h2>
             <div class="form-group">
                 <label>Cliente</label>
-                <select id="manual-cot-cliente" class="form-control"></select>
+                <select id="manual-cot-cliente" class="form-control" onchange="cambiarNivelCliente()"></select>
             </div>
             <div class="form-group" style="position:relative;">
                 <label>Buscar Producto</label>
@@ -323,7 +338,6 @@
         </div>
     </div>
 
-    <!-- SCRIPT PWA -->
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js').then(function(registration) {
