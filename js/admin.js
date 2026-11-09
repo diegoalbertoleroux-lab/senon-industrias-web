@@ -1,52 +1,33 @@
 import { auth, db } from './firebase-config.js';
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { collection, addDoc, getDocs, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, addDoc, getDocs, doc, setDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// ⚠️ IMPORTANTE: CAMBIA ESTO POR TU CORREO DE ADMINISTRADOR
-const ADMIN_EMAIL = "diegoalbertoleroux@gmail.com"; 
+const ADMIN_EMAIL = "diegoalbertoleroux@gmail.com"; // ⚠️ VERIFICA TU CORREO
 
+// --- LOGIN ---
 const loginSection = document.getElementById('admin-login');
 const adminMain = document.getElementById('admin-main');
-const formLogin = document.getElementById('form-admin-login');
 const loginMsg = document.getElementById('login-msg');
 
-formLogin.addEventListener('submit', async (e) => {
+document.getElementById('form-admin-login').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email = document.getElementById('admin-email').value;
-    const pass = document.getElementById('admin-password').value;
-    
-    loginMsg.textContent = "Verificando...";
-    loginMsg.className = "message";
-    loginMsg.style.display = 'block';
-
-    try {
-        await signInWithEmailAndPassword(auth, email, pass);
-        loginMsg.style.display = 'none';
-    } catch (error) {
-        loginMsg.textContent = "Error: " + error.code; 
-        loginMsg.className = "message error";
-    }
+    try { await signInWithEmailAndPassword(auth, document.getElementById('admin-email').value, document.getElementById('admin-password').value); } 
+    catch (error) { loginMsg.textContent = "Error: " + error.code; loginMsg.className = "message error"; }
 });
 
 onAuthStateChanged(auth, (user) => {
     if (user && user.email === ADMIN_EMAIL) {
-        loginSection.style.display = 'none';
-        adminMain.style.display = 'block';
-        cargarProductos();
-        cargarClientes();
+        loginSection.style.display = 'none'; adminMain.style.display = 'block';
+        cargarCotizaciones(); cargarTickets(); cargarProductos(); cargarClientes();
     } else if (user && user.email !== ADMIN_EMAIL) {
-        signOut(auth);
-        loginMsg.textContent = "No tienes permisos de administrador.";
-        loginMsg.className = "message error";
-        loginMsg.style.display = 'block';
+        signOut(auth); loginMsg.textContent = "No autorizado."; loginMsg.className = "message error";
     } else {
-        loginSection.style.display = 'flex';
-        adminMain.style.display = 'none';
+        loginSection.style.display = 'flex'; adminMain.style.display = 'none';
     }
 });
-
 document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
 
+// --- PESTAÑAS ---
 document.querySelectorAll('.admin-tab').forEach(tab => {
     tab.addEventListener('click', (e) => {
         document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
@@ -56,103 +37,100 @@ document.querySelectorAll('.admin-tab').forEach(tab => {
     });
 });
 
-const formProduct = document.getElementById('form-product');
-const adminMessage = document.getElementById('admin-message');
+// --- COTIZACIONES ---
+let cotizacionActualId = null;
+async function cargarCotizaciones() {
+    const tbody = document.getElementById('table-cotizaciones');
+    const querySnapshot = await getDocs(collection(db, "cotizaciones"));
+    tbody.innerHTML = '';
+    querySnapshot.forEach((docSnap) => {
+        const c = docSnap.data();
+        if (c.estado === 'pendiente') {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${new Date(c.fecha.seconds * 1000).toLocaleDateString()}</td>
+                    <td>${c.email}</td>
+                    <td>${c.productos.map(p => p.nombre).join(', ')}</td>
+                    <td><button class="btn-primary" style="padding:5px 10px; font-size:12px;" onclick="abrirCotizacion('${docSnap.id}', '${encodeURIComponent(JSON.stringify(c.productos))}')">Procesar</button></td>
+                </tr>`;
+        }
+    });
+}
 
-formProduct.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn = document.getElementById('btn-save');
-    btn.textContent = "Guardando...";
-    btn.disabled = true;
+window.abrirCotizacion = (id, productosStr) => {
+    cotizacionActualId = id;
+    const productos = JSON.parse(decodeURIComponent(productosStr));
+    document.getElementById('quote-details').innerHTML = productos.map(p => `<div>${p.cantidad}x ${p.nombre} (ID: ${p.id})</div>`).join('');
+    document.getElementById('modal-quote').classList.add('active');
+};
+document.getElementById('close-quote').addEventListener('click', () => document.getElementById('modal-quote').classList.remove('active'));
 
-    const nombre = document.getElementById('prod-nombre').value;
-    const categoria = document.getElementById('prod-categoria').value;
-    const desc = document.getElementById('prod-desc').value;
-
+document.getElementById('btn-save-quote').addEventListener('click', async () => {
+    if (!cotizacionActualId) return;
+    const nivel = document.getElementById('quote-price-level').value;
+    // Aquí en el futuro conectaremos con jsPDF. Por ahora actualizamos el estado.
     try {
-        const docRef = await addDoc(collection(db, "catalogo"), {
-            nombre: nombre,
-            categoria: categoria,
-            descripcion: desc
-        });
+        await updateDoc(doc(db, "cotizaciones", cotizacionActualId), { estado: "cotizada", nivel_precio: nivel });
+        alert("Cotización procesada. (El PDF se generará en la próxima fase).");
+        document.getElementById('modal-quote').classList.remove('active');
+        cargarCotizaciones();
+    } catch (error) { alert("Error al actualizar."); }
+});
 
-        await setDoc(doc(db, "precios", docRef.id), {
-            producto_id: docRef.id,
-            precio_A: parseFloat(document.getElementById('prod-pA').value),
-            precio_B: parseFloat(document.getElementById('prod-pB').value),
-            precio_C: parseFloat(document.getElementById('prod-pC').value),
-            precio_D: parseFloat(document.getElementById('prod-pD').value)
-        });
+// --- SERVICIO TÉCNICO ---
+async function cargarTickets() {
+    const tbody = document.getElementById('table-servicio');
+    const querySnapshot = await getDocs(collection(db, "tickets_servicio"));
+    tbody.innerHTML = '';
+    querySnapshot.forEach((docSnap) => {
+        const t = docSnap.data();
+        tbody.innerHTML += `
+            <tr>
+                <td><strong>${t.cliente}</strong></td>
+                <td>${t.equipo}</td>
+                <td>${t.falla}</td>
+                <td><span class="badge">${t.estado}</span></td>
+                <td><button class="btn-outline" style="padding:4px 8px; font-size:12px;" onclick="avanzarTicket('${docSnap.id}', '${t.estado}')">Avanzar</button></td>
+            </tr>`;
+    });
+}
 
-        adminMessage.textContent = "Producto y precios guardados.";
-        adminMessage.className = "message success";
-        adminMessage.style.display = 'block';
-        formProduct.reset();
-        cargarProductos();
-        setTimeout(() => { adminMessage.style.display = 'none'; }, 3000);
+window.avanzarTicket = async (id, estadoActual) => {
+    let nuevoEstado = "En Reparación";
+    if (estadoActual === "En Reparación") nuevoEstado = "Listo";
+    else if (estadoActual === "Listo") nuevoEstado = "Entregado";
+    
+    await updateDoc(doc(db, "tickets_servicio", id), { estado: nuevoEstado });
+    cargarTickets();
+};
 
-    } catch (error) {
-        adminMessage.textContent = "Error al guardar.";
-        adminMessage.className = "message error";
-        adminMessage.style.display = 'block';
-    } finally {
-        btn.textContent = "Guardar en Base de Datos";
-        btn.disabled = false;
-    }
+// --- PRODUCTOS Y CLIENTES (Igual que antes) ---
+document.getElementById('form-product').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const docRef = await addDoc(collection(db, "catalogo"), {
+        nombre: document.getElementById('prod-nombre').value, categoria: document.getElementById('prod-categoria').value, descripcion: document.getElementById('prod-desc').value
+    });
+    await setDoc(doc(db, "precios", docRef.id), {
+        producto_id: docRef.id, precio_A: parseFloat(document.getElementById('prod-pA').value), precio_B: parseFloat(document.getElementById('prod-pB').value), precio_C: parseFloat(document.getElementById('prod-pC').value), precio_D: parseFloat(document.getElementById('prod-pD').value)
+    });
+    document.getElementById('form-product').reset();
+    cargarProductos();
 });
 
 async function cargarProductos() {
     const tbody = document.getElementById('table-body');
-    tbody.innerHTML = '<tr><td>Cargando...</td></tr>';
     const querySnapshot = await getDocs(collection(db, "catalogo"));
     tbody.innerHTML = '';
-    querySnapshot.forEach((doc) => {
-        const p = doc.data();
-        tbody.innerHTML += `<tr><td><strong>${p.nombre}</strong></td><td><span class="badge">${p.categoria}</span></td></tr>`;
-    });
+    querySnapshot.forEach((doc) => { const p = doc.data(); tbody.innerHTML += `<tr><td>${p.nombre}</td><td>${p.categoria}</td></tr>`; });
 }
 
 async function cargarClientes() {
     const tbody = document.getElementById('table-clientes');
-    tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
-    
-    try {
-        const querySnapshot = await getDocs(collection(db, "usuarios"));
-        tbody.innerHTML = '';
-        
-        if(querySnapshot.empty) {
-            tbody.innerHTML = '<tr><td colspan="5">No hay clientes registrados.</td></tr>';
-            return;
-        }
-
-        querySnapshot.forEach((docSnap) => {
-            const c = docSnap.data();
-            const isPendiente = c.estado === 'pendiente';
-            const btnAccion = isPendiente 
-                ? `<button class="btn-success" onclick="aprobarCliente('${docSnap.id}')">Aprobar</button>`
-                : `<span style="color:var(--success); font-weight:bold;">Aprobado</span>`;
-
-            tbody.innerHTML += `
-                <tr>
-                    <td><strong>${c.nombre_laboratorio}</strong></td>
-                    <td>${c.rif}</td>
-                    <td>${c.nombre_contacto}<br><small>${c.telefono}</small></td>
-                    <td>${isPendiente ? '⏳ Pendiente' : '✅ Aprobado'}</td>
-                    <td>${btnAccion}</td>
-                </tr>
-            `;
-        });
-    } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="5" style="color:red;">Error al cargar clientes.</td></tr>';
-    }
+    const querySnapshot = await getDocs(collection(db, "usuarios"));
+    tbody.innerHTML = '';
+    querySnapshot.forEach((docSnap) => {
+        const c = docSnap.data();
+        tbody.innerHTML += `<tr><td>${c.nombre_laboratorio}</td><td>${c.rif}</td><td>${c.nombre_contacto}</td><td>${c.estado}</td><td>${c.estado === 'pendiente' ? `<button class="btn-success" onclick="aprobar('${docSnap.id}')">Aprobar</button>` : 'OK'}</td></tr>`;
+    });
 }
-
-window.aprobarCliente = async (uid) => {
-    try {
-        const userRef = doc(db, "usuarios", uid);
-        await updateDoc(userRef, { estado: "aprobado" });
-        cargarClientes(); 
-    } catch (error) {
-        alert("Error al aprobar cliente.");
-    }
-};
+window.aprobar = async (uid) => { await updateDoc(doc(db, "usuarios", uid), { estado: "aprobado" }); cargarClientes(); };
