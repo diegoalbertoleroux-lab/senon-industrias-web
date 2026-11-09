@@ -2,8 +2,9 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
+// Tu configuración exacta de Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyCbik6YijIWLjO8ryopaE5wYDf6lwS54",
+  apiKey: "AIzaSyCbik6YijIIWLjOr8ryopaE5wYDf6lwS54",
   authDomain: "senon-industrias.firebaseapp.com",
   projectId: "senon-industrias",
   storageBucket: "senon-industrias.firebasestorage.app",
@@ -12,7 +13,10 @@ const firebaseConfig = {
   measurementId: "G-25V25931ZW"
 };
 
+// Inicializamos Firebase
 const app = initializeApp(firebaseConfig);
+
+// Exportamos los servicios para usarlos en la app
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
