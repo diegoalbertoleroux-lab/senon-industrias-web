@@ -1,16 +1,16 @@
 import { auth, db } from './firebase-config.js';
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { collection, addDoc, getDocs, doc, setDoc, updateDoc, query, where, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, addDoc, getDocs, doc, setDoc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const ADMIN_EMAIL = "diegoalbertoleroux@gmail.com"; // ⚠️ CAMBIA ESTO
-const WA_NUMBER = "584143549096";
 let TASA_BCV = 36.50;
 let PRODUCTOS_CACHE = {};
 let CLIENTES_CACHE = {};
 let PROVEEDORES_CACHE = {};
 let COTIZACION_ACTUAL = null;
+let COMPRA_ACTUAL_ITEMS = [];
 
-// 1. INICIALIZACIÓN Y LOGIN
+// --- INICIALIZACIÓN ---
 document.getElementById('form-admin-login').addEventListener('submit', async (e) => {
     e.preventDefault();
     try { await signInWithEmailAndPassword(auth, document.getElementById('admin-email').value, document.getElementById('admin-password').value); } 
@@ -27,11 +27,9 @@ onAuthStateChanged(auth, (user) => {
         document.getElementById('app-main').style.display = 'none';
     }
 });
-
 document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
 
-// 2. NAVEGACIÓN (SIDEBAR)
-const viewTitles = { 'view-dashboard': 'Dashboard', 'view-cotizaciones': 'Cotizaciones', 'view-facturas': 'Facturación Manual', 'view-inventario': 'Inventario', 'view-clientes': 'Clientes', 'view-proveedores': 'Proveedores', 'view-servicio': 'Servicio Técnico', 'view-cuentas': 'Cuentas' };
+// --- NAVEGACIÓN ---
 document.querySelectorAll('.menu-item').forEach(item => {
     item.addEventListener('click', (e) => {
         e.preventDefault();
@@ -40,13 +38,12 @@ document.querySelectorAll('.menu-item').forEach(item => {
         e.currentTarget.classList.add('active');
         const viewId = e.currentTarget.dataset.view;
         document.getElementById(viewId).classList.add('active');
-        document.getElementById('page-title').textContent = viewTitles[viewId];
-        document.querySelector('.sidebar').classList.remove('open'); // Cerrar en móvil
+        document.getElementById('page-title').textContent = e.currentTarget.textContent;
+        document.querySelector('.sidebar').classList.remove('open');
     });
 });
-document.getElementById('menu-toggle').addEventListener('click', () => document.querySelector('.sidebar').classList.toggle('open'));
 
-// 3. CARGA DE DATOS GLOBAL
+// --- INICIALIZAR DATOS ---
 async function initApp() {
     try {
         const res = await fetch("https://ve.dolarapi.com/v1/dolares/oficial");
@@ -56,124 +53,127 @@ async function initApp() {
     } catch (e) { document.getElementById('tasa-display').textContent = "Tasa BCV: Error"; }
 
     await cargarInventario();
-    await cargarClientes();
-    await cargarProveedores();
+    await cargarClientesYProveedores();
     cargarCotizaciones();
+    cargarFacturas();
     cargarServicios();
     cargarCuentas();
     cargarCompras();
 }
 
-// 4. INVENTARIO Y AJUSTES MASIVOS
+// --- 1. INVENTARIO Y CATEGORÍAS ---
 async function cargarInventario() {
     const tbody = document.getElementById('tbody-inventario');
-    tbody.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
+    const selectCat = document.getElementById('filtro-categoria-inv');
+    
     const catSnap = await getDocs(collection(db, "catalogo"));
     const preSnap = await getDocs(collection(db, "precios"));
-    const precios = {};
-    preSnap.forEach(p => precios[p.data().producto_id] = p.data());
     
-    tbody.innerHTML = '';
+    const precios = {}; preSnap.forEach(p => precios[p.data().producto_id] = p.data());
+    
+    let categorias = new Set();
+    PRODUCTOS_CACHE = {}; // Limpiar cache
+    
     catSnap.forEach(docSnap => {
         const p = docSnap.data();
         const pr = precios[docSnap.id] || { precio_A: 0, costo: 0 };
-        PRODUCTOS_CACHE[docSnap.id] = { ...p, ...pr };
-        tbody.innerHTML += `
-            <tr>
-                <td>${p.codigo || 'N/A'}</td><td>${p.nombre}</td><td>${p.marca || ''}</td>
-                <td>$${pr.costo.toFixed(2)}</td><td>$${pr.precio_A.toFixed(2)}</td>
-                <td>${p.exento ? '✅' : '❌'}</td>
-            </tr>`;
+        PRODUCTOS_CACHE[docSnap.id] = { id: docSnap.id, ...p, ...pr };
+        if (p.categoria) categorias.add(p.categoria);
     });
+
+    // Llenar select de categorías
+    selectCat.innerHTML = '<option value="">Todas las categorías</option>';
+    Array.from(categorias).sort().forEach(c => { selectCat.innerHTML += `<option value="${c}">${c}</option>`; });
+
+    filtrarInventario();
 }
 
-window.aplicarAjusteMasivo = async () => {
-    const pct = parseFloat(document.getElementById('ajuste-porcentaje').value);
-    const nivel = document.getElementById('ajuste-nivel').value;
-    if (isNaN(pct)) return alert("Ingresa un porcentaje válido");
+window.filtrarInventario = () => {
+    const cat = document.getElementById('filtro-categoria-inv').value;
+    const tbody = document.getElementById('tbody-inventario');
+    tbody.innerHTML = '';
     
-    if (!confirm(`¿Aplicar ${pct}% al ${nivel} de todos los productos?`)) return;
-    
-    const preSnap = await getDocs(collection(db, "precios"));
-    for (let d of preSnap.docs) {
-        const data = d.data();
-        let nuevoPrecio = data[nivel] + (data[nivel] * (pct / 100));
-        await updateDoc(doc(db, "precios", d.id), { [nivel]: nuevoPrecio });
-    }
-    alert("Ajuste aplicado."); cargarInventario();
+    Object.values(PRODUCTOS_CACHE).forEach(p => {
+        if (cat === "" || p.categoria === cat) {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${p.codigo || 'N/A'}</td><td>${p.nombre}</td><td><span class="badge">${p.categoria}</span></td>
+                    <td>${p.stock || 0}</td><td>$${(p.costo || 0).toFixed(2)}</td><td>$${(p.precio_A || 0).toFixed(2)}</td>
+                    <td>${p.exento ? '✅' : '❌'}</td>
+                    <td><button class="btn btn-outline btn-sm" onclick="editarProducto('${p.id}')">Editar</button></td>
+                </tr>`;
+        }
+    });
+};
+
+window.abrirModalProducto = () => {
+    document.getElementById('form-producto').reset();
+    document.getElementById('prod-id').value = '';
+    document.getElementById('modal-prod-title').textContent = 'Nuevo Producto';
+    document.getElementById('modal-producto').classList.add('active');
+};
+
+window.editarProducto = (id) => {
+    const p = PRODUCTOS_CACHE[id];
+    document.getElementById('prod-id').value = id;
+    document.getElementById('inv-codigo').value = p.codigo || '';
+    document.getElementById('inv-nombre').value = p.nombre || '';
+    document.getElementById('inv-marca').value = p.marca || '';
+    document.getElementById('inv-categoria').value = p.categoria || '';
+    document.getElementById('inv-costo').value = p.costo || 0;
+    document.getElementById('inv-pA').value = p.precio_A || 0;
+    document.getElementById('inv-stock').value = p.stock || 0;
+    document.getElementById('inv-exento').checked = p.exento || false;
+    document.getElementById('modal-prod-title').textContent = 'Editar Producto';
+    document.getElementById('modal-producto').classList.add('active');
 };
 
 document.getElementById('form-producto').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const id = document.getElementById('prod-id').value;
     const pA = parseFloat(document.getElementById('inv-pA').value);
-    const docRef = await addDoc(collection(db, "catalogo"), {
+    
+    const dataPublica = {
         codigo: document.getElementById('inv-codigo').value,
         nombre: document.getElementById('inv-nombre').value,
         marca: document.getElementById('inv-marca').value,
         categoria: document.getElementById('inv-categoria').value,
         exento: document.getElementById('inv-exento').checked,
-        descripcion: "", stock: parseInt(document.getElementById('inv-stock').value)
-    });
-    await setDoc(doc(db, "precios", docRef.id), {
-        producto_id: docRef.id, costo: parseFloat(document.getElementById('inv-costo').value),
+        stock: parseInt(document.getElementById('inv-stock').value)
+    };
+    const dataPrecios = {
+        costo: parseFloat(document.getElementById('inv-costo').value),
         precio_A: pA, precio_B: pA * 0.95, precio_C: pA * 0.90, precio_D: pA * 0.85
-    });
-    document.getElementById('form-producto').reset();
-    document.getElementById('msg-inventario').textContent = "Guardado"; document.getElementById('msg-inventario').className = "message success";
+    };
+
+    if (id) {
+        await updateDoc(doc(db, "catalogo", id), dataPublica);
+        await updateDoc(doc(db, "precios", id), dataPrecios);
+    } else {
+        const docRef = await addDoc(collection(db, "catalogo"), dataPublica);
+        dataPrecios.producto_id = docRef.id;
+        await setDoc(doc(db, "precios", docRef.id), dataPrecios);
+    }
+    
+    document.getElementById('modal-producto').classList.remove('active');
     cargarInventario();
-    setTimeout(() => document.getElementById('msg-inventario').style.display = 'none', 2000);
 });
 
-// 5. CLIENTES Y PROVEEDORES
-async function cargarClientes() {
-    const tbody = document.getElementById('tbody-clientes');
-    const select = document.getElementById('cxc-cliente');
-    const snap = await getDocs(collection(db, "usuarios"));
-    tbody.innerHTML = ''; select.innerHTML = '<option value="">Seleccione cliente...</option>';
-    snap.forEach(d => {
-        const c = d.data(); CLIENTES_CACHE[d.id] = c;
-        tbody.innerHTML += `<tr><td>${c.nombre_laboratorio}</td><td>${c.rif}</td><td>${c.nombre_contacto}</td><td>${c.estado}</td><td>${c.estado==='pendiente'?`<button class="btn btn-success btn-sm" onclick="aprobarCliente('${d.id}')">Aprobar</button>`:'OK'}</td></tr>`;
-        select.innerHTML += `<option value="${d.id}">${c.nombre_laboratorio}</option>`;
-    });
-}
-window.aprobarCliente = async (id) => { await updateDoc(doc(db, "usuarios", id), { estado: "aprobado" }); cargarClientes(); };
-
-async function cargarProveedores() {
-    const select = document.getElementById('compra-proveedor');
-    const selectCxp = document.getElementById('cxp-proveedor');
-    const snap = await getDocs(collection(db, "proveedores"));
-    select.innerHTML = ''; selectCxp.innerHTML = '';
-    snap.forEach(d => {
-        PROVEEDORES_CACHE[d.id] = d.data();
-        select.innerHTML += `<option value="${d.id}">${d.data().nombre}</option>`;
-        selectCxp.innerHTML += `<option value="${d.id}">${d.data().nombre}</option>`;
-    });
-}
-document.getElementById('form-proveedor').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    await addDoc(collection(db, "proveedores"), {
-        nombre: document.getElementById('prov-nombre').value, rif: document.getElementById('prov-rif').value, contacto: document.getElementById('prov-contacto').value
-    });
-    document.getElementById('form-proveedor').reset(); cargarProveedores();
-});
-
-// 6. COTIZACIONES Y PDFs (El diseño exacto del PDF)
+// --- 2. COTIZACIONES Y FACTURAS ---
 async function cargarCotizaciones() {
     const tbody = document.getElementById('tbody-cotizaciones');
     const snap = await getDocs(collection(db, "cotizaciones"));
     tbody.innerHTML = '';
     snap.forEach(d => {
         const c = d.data();
-        tbody.innerHTML += `
-            <tr>
-                <td>${new Date(c.fecha.seconds*1000).toLocaleDateString()}</td><td>${c.email}</td>
-                <td>${c.productos.map(p=>p.nombre).join(', ')}</td><td><span class="badge">${c.estado}</span></td>
-                <td>
-                    ${c.estado === 'pendiente' ? `<button class="btn btn-primary btn-sm" onclick="abrirCotizar('${d.id}', '${encodeURIComponent(JSON.stringify(c))}')">Procesar</button>` : 
-                    `<button class="btn btn-outline btn-sm" onclick="generarPDF('${encodeURIComponent(JSON.stringify(c))}', 'COTIZACION')">PDF</button>
-                     <button class="btn btn-success btn-sm" onclick="generarPDF('${encodeURIComponent(JSON.stringify(c))}', 'NOTA DE ENTREGA')">Nota Entrega</button>`}
-                </td>
-            </tr>`;
+        if(c.estado === 'pendiente') {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${new Date(c.fecha.seconds*1000).toLocaleDateString()}</td><td>${c.email}</td>
+                    <td><span class="badge">Pendiente</span></td>
+                    <td><button class="btn btn-primary btn-sm" onclick="abrirCotizar('${d.id}', '${encodeURIComponent(JSON.stringify(c))}')">Procesar</button></td>
+                </tr>`;
+        }
     });
 }
 
@@ -187,133 +187,214 @@ window.guardarCotizacion = async () => {
     const nivel = document.getElementById('cotizar-nivel').value;
     let total = 0; let prods = [];
     for (let p of COTIZACION_ACTUAL.productos) {
-        const pr = PRODUCTOS_CACHE[p.id]; // Asumiendo que p.id es el ID del catálogo
+        const pr = PRODUCTOS_CACHE[p.id]; 
         let precioU = pr ? pr[nivel] : 0;
         total += precioU * p.cantidad;
-        prods.push({ ...p, precio_unitario: precioU, subtotal: precioU * p.cantidad, codigo: pr ? pr.codigo : 'N/A' });
+        prods.push({ ...p, precio_unitario: precioU, subtotal: precioU * p.cantidad, codigo: pr ? pr.codigo : 'N/A', exento: pr ? pr.exento : false });
     }
+    
     await updateDoc(doc(db, "cotizaciones", COTIZACION_ACTUAL.id), {
-        estado: "cotizada", nivel_precio: nivel, total_usd: total, total_ves: total * TASA_BCV, tasa_bcv: TASA_BCV, productos_con_precio: prods
+        estado: "aprobada", nivel_precio: nivel, total_usd: total, productos_con_precio: prods
     });
+
+    // CREAR CUENTA POR COBRAR AUTOMÁTICA
+    await addDoc(collection(db, "cxc"), {
+        cliente_email: COTIZACION_ACTUAL.email,
+        cotizacion_id: COTIZACION_ACTUAL.id,
+        monto: total, estado: "pendiente", fecha: new Date()
+    });
+
     document.getElementById('modal-cotizar').classList.remove('active');
-    cargarCotizaciones();
+    cargarCotizaciones(); cargarFacturas(); cargarCuentas();
 };
 
+async function cargarFacturas() {
+    const tbody = document.getElementById('tbody-facturas');
+    const snap = await getDocs(collection(db, "cotizaciones"));
+    tbody.innerHTML = '';
+    snap.forEach(d => {
+        const c = d.data();
+        if (c.estado === 'aprobada' || c.estado === 'facturada') {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${new Date().toLocaleDateString()}</td><td>${c.email}</td><td>$${c.total_usd.toFixed(2)}</td>
+                    <td><span class="badge">${c.estado}</span></td>
+                    <td>
+                        <button class="btn btn-outline btn-sm" onclick="generarPDF('${encodeURIComponent(JSON.stringify(c))}', 'COTIZACIÓN')">Cotización</button>
+                        <button class="btn btn-primary btn-sm" onclick="generarPDF('${encodeURIComponent(JSON.stringify(c))}', 'FACTURA')">Factura (IVA)</button>
+                    </td>
+                </tr>`;
+        }
+    });
+}
+
+// --- 3. GENERACIÓN DE PDF (COTIZACIÓN Y FACTURA CON IVA) ---
 window.generarPDF = (str, tipo) => {
     const c = JSON.parse(decodeURIComponent(str));
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
-    // Encabezado idéntico al PDF que enviaste
+    // Encabezado (Ajusta esto a tus datos reales)
     doc.setFontSize(10); doc.setTextColor(100);
     doc.text("Calle caracas cruce con callejón sin nombre edif. Primer piso 1 of 3, 4 y 5", 14, 15);
     doc.text("barrio el merecure, angostura del Orinoco ciudad Bolivar", 14, 20);
     doc.text("R.I.F: J-50719484-1 | Telf: 0414-3549096", 14, 25);
     
-    // Título
     doc.setFontSize(16); doc.setTextColor(0);
     doc.text(tipo, 14, 40);
     
-    // Datos Cliente
     doc.setFontSize(10);
     doc.text(`CLIENTE: ${c.email.split('@')[0].toUpperCase()}`, 14, 50);
-    doc.text(`C.I/RIF: ${c.rif_cliente || 'V-00000000'}`, 14, 55);
-    doc.text(`DIRECCIÓN: ${c.direccion_cliente || 'No registrada'}`, 14, 60);
-    
     doc.text(`FECHA: ${new Date().toLocaleDateString()}`, 150, 50);
 
-    // Tabla
-    const filas = c.productos_con_precio.map(p => [
-        p.cantidad, p.nombre, p.codigo || '-', `$${p.precio_unitario.toFixed(2)}`, `$${p.subtotal.toFixed(2)}`
-    ]);
-    
-    doc.autoTable({
-        startY: 70,
-        head: [["CANTIDAD", "DESCRIPCIÓN", "SKU", "PRECIO USD", "TOTAL USD"]],
-        body: filas,
-        theme: 'plain',
-        headStyles: { fontStyle: 'bold', textColor: [0,0,0], lineWidth: { bottom: 0.5 } },
-        bodyStyles: { lineWidth: { bottom: 0.1 }, textColor: [50,50,50] }
+    // Cálculos de Facturación
+    let baseImponible = 0; let montoExento = 0;
+    const filas = c.productos_con_precio.map(p => {
+        if (p.exento) { montoExento += p.subtotal; } 
+        else { baseImponible += p.subtotal; }
+        return [ p.cantidad, p.nombre, p.codigo || '-', `$${p.precio_unitario.toFixed(2)}`, `$${p.subtotal.toFixed(2)}`, `Bs. ${(p.subtotal * TASA_BCV).toFixed(2)}` ];
     });
 
-    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.autoTable({
+        startY: 70,
+        head: [["CANT.", "DESCRIPCIÓN", "SKU", "PRECIO USD", "TOTAL USD", "TOTAL Bs."]],
+        body: filas,
+        theme: 'grid',
+        headStyles: { fillColor: [26, 43, 76] }
+    });
+
+    let finalY = doc.lastAutoTable.finalY + 10;
     doc.setFontSize(10); doc.setFont("helvetica", "bold");
-    doc.text(`TOTAL DE ITEMS: ${c.productos_con_precio.length}`, 14, finalY);
-    doc.text(`SUBTOTAL USD: $${c.total_usd.toFixed(2)}`, 130, finalY);
-    doc.text(`TOTAL USD: $${c.total_usd.toFixed(2)}`, 130, finalY + 7);
-    doc.text(`TOTAL Bs: Bs. ${c.total_ves.toFixed(2)}`, 130, finalY + 14);
-
-    doc.setFont("helvetica", "normal");
-    doc.text("Observaciones", 14, finalY + 30);
-    doc.line(14, finalY + 32, 190, finalY + 32);
     
-    doc.save(`${tipo.replace(' ', '_')}.pdf`);
+    if (tipo === 'FACTURA') {
+        const iva = baseImponible * 0.16;
+        const totalFactura = baseImponible + montoExento + iva;
+        
+        doc.text(`Base Imponible: $${baseImponible.toFixed(2)}`, 130, finalY);
+        doc.text(`Monto Exento: $${montoExento.toFixed(2)}`, 130, finalY + 6);
+        doc.text(`IVA (16%): $${iva.toFixed(2)}`, 130, finalY + 12);
+        doc.setFontSize(12);
+        doc.text(`TOTAL FACTURA: $${totalFactura.toFixed(2)}`, 130, finalY + 22);
+        doc.text(`TOTAL Bs: Bs. ${(totalFactura * TASA_BCV).toFixed(2)}`, 130, finalY + 28);
+    } else {
+        doc.text(`SUBTOTAL USD: $${c.total_usd.toFixed(2)}`, 130, finalY);
+        doc.text(`TOTAL Bs: Bs. ${(c.total_usd * TASA_BCV).toFixed(2)}`, 130, finalY + 7);
+    }
+
+    doc.save(`${tipo}_${c.email.split('@')[0]}.pdf`);
 };
 
-// 7. FACTURACIÓN MANUAL
-window.calcularFactura = () => {
-    const base = parseFloat(document.getElementById('fac-base').value) || 0;
-    const exento = parseFloat(document.getElementById('fac-exento').value) || 0;
-    const iva = base * 0.16;
-    const igtf = (base + iva + exento) * 0.03; // Opcional si aplica
-    const totalUSD = base + iva + exento + igtf;
-    
-    document.getElementById('fac-iva-usd').textContent = `$${iva.toFixed(2)}`;
-    document.getElementById('fac-igtf-usd').textContent = `$${igtf.toFixed(2)}`;
-    document.getElementById('fac-total-usd').textContent = `$${totalUSD.toFixed(2)}`;
-    document.getElementById('fac-total-ves').textContent = `Bs. ${(totalUSD * TASA_BCV).toFixed(2)}`;
+// --- 4. COMPRAS Y BÚSQUEDA INTELIGENTE ---
+document.getElementById('compra-buscar-prod').addEventListener('input', (e) => {
+    const queryText = e.target.value.toLowerCase();
+    const resultsDiv = document.getElementById('resultados-busqueda');
+    if (queryText.length < 2) { resultsDiv.style.display = 'none'; return; }
+
+    const matches = Object.values(PRODUCTOS_CACHE).filter(p => 
+        p.nombre.toLowerCase().includes(queryText) || (p.codigo && p.codigo.toLowerCase().includes(queryText))
+    ).slice(0, 5);
+
+    if (matches.length > 0) {
+        resultsDiv.innerHTML = matches.map(p => `
+            <div style="padding:10px; border-bottom:1px solid var(--border-color); cursor:pointer;" onclick="agregarACompra('${p.id}')">
+                <strong>${p.nombre}</strong> (${p.codigo}) - Costo: $${p.costo}
+            </div>
+        `).join('');
+        resultsDiv.style.display = 'block';
+    } else {
+        resultsDiv.innerHTML = `<div style="padding:10px; color:var(--primary); cursor:pointer;" onclick="abrirModalProducto()">Producto no encontrado. Haga clic para crearlo.</div>`;
+        resultsDiv.style.display = 'block';
+    }
+});
+
+window.agregarACompra = (id) => {
+    const p = PRODUCTOS_CACHE[id];
+    COMPRA_ACTUAL_ITEMS.push({ id, nombre: p.nombre, costo: p.costo, cantidad: 1 });
+    document.getElementById('resultados-busqueda').style.display = 'none';
+    document.getElementById('compra-buscar-prod').value = '';
+    renderCompraItems();
 };
 
-// 8. SERVICIO TÉCNICO Y CUENTAS
+function renderCompraItems() {
+    const container = document.getElementById('lista-compra-actual');
+    let total = 0;
+    container.innerHTML = COMPRA_ACTUAL_ITEMS.map((item, index) => {
+        total += item.costo * item.cantidad;
+        return `<div style="display:flex; justify-content:space-between; background:var(--input-bg); padding:10px; margin-bottom:5px; border-radius:5px;">
+            <span>${item.nombre}</span>
+            <span>$${(item.costo * item.cantidad).toFixed(2)}</span>
+            <button type="button" class="btn btn-danger btn-sm" onclick="quitarDeCompra(${index})">X</button>
+        </div>`;
+    }).join('');
+    document.getElementById('compra-monto').value = total.toFixed(2);
+}
+
+window.quitarDeCompra = (index) => {
+    COMPRA_ACTUAL_ITEMS.splice(index, 1);
+    renderCompraItems();
+};
+
+document.getElementById('form-compra').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (COMPRA_ACTUAL_ITEMS.length === 0) return alert("Agrega al menos un producto");
+    const pagada = document.getElementById('compra-pagada').checked;
+    const total = parseFloat(document.getElementById('compra-monto').value);
+
+    await addDoc(collection(db, "compras"), {
+        proveedor_id: document.getElementById('compra-proveedor').value,
+        items: COMPRA_ACTUAL_ITEMS, monto: total, pagada: pagada, fecha: new Date()
+    });
+
+    if (!pagada) {
+        await addDoc(collection(db, "cxp"), { monto: total, estado: "pendiente", fecha: new Date() });
+    }
+
+    COMPRA_ACTUAL_ITEMS = [];
+    document.getElementById('form-compra').reset(); renderCompraItems();
+    cargarCompras(); cargarCuentas();
+});
+
+// --- 5. SERVICIO TÉCNICO MANUAL ---
+document.getElementById('form-reparacion-manual').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await addDoc(collection(db, "tickets_servicio"), {
+        cliente: document.getElementById('rep-cliente').value, equipo: document.getElementById('rep-equipo').value,
+        falla: document.getElementById('rep-falla').value, estado: "Recibido", fecha: new Date()
+    });
+    document.getElementById('modal-reparacion').classList.remove('active');
+    document.getElementById('form-reparacion-manual').reset();
+    cargarServicios();
+});
+
 async function cargarServicios() {
     const tbody = document.getElementById('tbody-servicio');
     const snap = await getDocs(collection(db, "tickets_servicio"));
     tbody.innerHTML = '';
     snap.forEach(d => {
         const t = d.data();
-        tbody.innerHTML += `<tr><td>${t.cliente}</td><td>${t.equipo}</td><td>${t.falla}</td><td><span class="badge">${t.estado}</span></td><td><button class="btn btn-outline btn-sm" onclick="generarInformeTecnico('${encodeURIComponent(JSON.stringify(t))}')">Informe PDF</button></td></tr>`;
+        tbody.innerHTML += `<tr><td>${t.cliente}</td><td>${t.equipo}</td><td>${t.falla}</td><td><span class="badge">${t.estado}</span></td><td><button class="btn btn-outline btn-sm" onclick="alert('PDF en construccion')">Informe</button></td></tr>`;
     });
 }
-window.generarInformeTecnico = (str) => {
-    const t = JSON.parse(decodeURIComponent(str));
-    const { jsPDF } = window.jspdf; const doc = new jsPDF();
-    // (Aquí iría el diseño del Informe DYM exacto)
-    doc.text("INFORME DE SERVICIO TECNICO", 14, 20);
-    doc.text(`Cliente: ${t.cliente}`, 14, 30);
-    doc.text(`Equipo: ${t.equipo}`, 14, 40);
-    doc.text(`Falla: ${t.falla}`, 14, 50);
-    doc.save("Informe_Tecnico.pdf");
-};
 
+// --- 6. CUENTAS ---
 async function cargarCuentas() {
     const cxc = await getDocs(collection(db, "cxc"));
     const tCxc = document.getElementById('tbody-cxc'); tCxc.innerHTML = '';
-    cxc.forEach(d => { tCxc.innerHTML += `<tr><td>${CLIENTES_CACHE[d.data().cliente_id]?.nombre_laboratorio||'N/A'}</td><td>$${d.data().monto}</td><td>${d.data().estado}</td></tr>`; });
+    cxc.forEach(d => { tCxc.innerHTML += `<tr><td>${d.data().cliente_email || 'Cliente Web'}</td><td>$${d.data().monto.toFixed(2)}</td><td><span class="badge">${d.data().estado}</span></td></tr>`; });
     
     const cxp = await getDocs(collection(db, "cxp"));
     const tCxp = document.getElementById('tbody-cxp'); tCxp.innerHTML = '';
-    cxp.forEach(d => { tCxp.innerHTML += `<tr><td>${PROVEEDORES_CACHE[d.data().proveedor_id]?.nombre||'N/A'}</td><td>$${d.data().monto}</td><td>${d.data().estado}</td></tr>`; });
+    cxp.forEach(d => { tCxp.innerHTML += `<tr><td>Proveedor</td><td>$${d.data().monto.toFixed(2)}</td><td><span class="badge">${d.data().estado}</span></td></tr>`; });
 }
 
-document.getElementById('form-cxc').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    await addDoc(collection(db, "cxc"), { cliente_id: document.getElementById('cxc-cliente').value, monto: parseFloat(document.getElementById('cxc-monto').value), estado: "pendiente" });
-    cargarCuentas();
-});
-document.getElementById('form-cxp').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    await addDoc(collection(db, "cxp"), { proveedor_id: document.getElementById('cxp-proveedor').value, monto: parseFloat(document.getElementById('cxp-monto').value), estado: "pendiente" });
-    cargarCuentas();
-});
-
+// Auxiliares
+async function cargarClientesYProveedores() {
+    const snapP = await getDocs(collection(db, "proveedores"));
+    const select = document.getElementById('compra-proveedor'); select.innerHTML = '';
+    snapP.forEach(d => { select.innerHTML += `<option value="${d.id}">${d.data().nombre}</option>`; });
+}
 async function cargarCompras() {
-    const tbody = document.getElementById('tbody-compras');
-    const snap = await getDocs(collection(db, "compras"));
-    tbody.innerHTML = '';
-    snap.forEach(d => { tbody.innerHTML += `<tr><td>${new Date(d.data().fecha.seconds*1000).toLocaleDateString()}</td><td>${PROVEEDORES_CACHE[d.data().proveedor_id]?.nombre}</td><td>$${d.data().monto}</td></tr>`; });
+    const tbody = document.getElementById('tbody-compras'); if(!tbody) return;
+    const snap = await getDocs(collection(db, "compras")); tbody.innerHTML = '';
+    snap.forEach(d => { tbody.innerHTML += `<tr><td>${new Date(d.data().fecha.seconds*1000).toLocaleDateString()}</td><td>Ver detalles</td><td>$${d.data().monto}</td></tr>`; });
 }
-document.getElementById('form-compra').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    await addDoc(collection(db, "compras"), { proveedor_id: document.getElementById('compra-proveedor').value, monto: parseFloat(document.getElementById('compra-monto').value), fecha: new Date() });
-    cargarCompras();
-});
