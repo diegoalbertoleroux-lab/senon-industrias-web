@@ -13,9 +13,8 @@ let COMPRA_ITEMS = [];
 let chartInstance = null;
 let TOTAL_GASTOS = 0;
 
-// Variables para controlar desde dónde abrimos el modal de producto
+// Variables para el flujo de creación rápida
 let origenCreacion = 'inventario'; 
-let buscadorActivo = ''; // 'compra' o 'manual'
 
 // --- LOGIN Y NAVEGACIÓN ---
 document.getElementById('form-admin-login').addEventListener('submit', async (e) => {
@@ -67,7 +66,7 @@ async function initApp() {
     cargarGastosYGrafica();
 }
 
-// --- 1. INVENTARIO ---
+// --- 1. INVENTARIO Y PRODUCTOS ---
 async function cargarInventario() {
     const selectCat = document.getElementById('filtro-categoria-inv');
     const catSnap = await getDocs(collection(db, "catalogo"));
@@ -106,7 +105,7 @@ window.filtrarInventario = () => {
 };
 
 window.abrirModalProducto = () => {
-    origenCreacion = 'inventario'; // Resetea el origen
+    origenCreacion = 'inventario'; 
     document.getElementById('form-producto').reset();
     document.getElementById('prod-id').value = '';
     document.getElementById('modal-prod-title').textContent = 'Nuevo Producto';
@@ -130,41 +129,48 @@ window.editarProducto = (id) => {
     document.getElementById('modal-producto').classList.add('active');
 };
 
-// GUARDAR PRODUCTO (MODIFICADO PARA EL FLUJO DE COMPRAS)
+// GUARDAR PRODUCTO CON FLUJO CONTINUO
 document.getElementById('form-producto').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = document.getElementById('prod-id').value;
     const pA = parseFloat(document.getElementById('inv-pA').value);
     const nombreProd = document.getElementById('inv-nombre').value;
     const costoProd = parseFloat(document.getElementById('inv-costo').value);
+    const codigoProd = document.getElementById('inv-codigo').value;
+    const stockProd = parseInt(document.getElementById('inv-stock').value);
+    const exentoProd = document.getElementById('inv-exento').checked;
     
     const dataPublica = {
-        codigo: document.getElementById('inv-codigo').value, nombre: nombreProd,
+        codigo: codigoProd, nombre: nombreProd,
         marca: document.getElementById('inv-marca').value, categoria: document.getElementById('inv-categoria').value,
         proveedor_id: document.getElementById('inv-proveedor').value,
-        exento: document.getElementById('inv-exento').checked, stock: parseInt(document.getElementById('inv-stock').value)
+        exento: exentoProd, stock: stockProd
     };
     const dataPrecios = { costo: costoProd, precio_A: pA, precio_B: pA*0.95, precio_C: pA*0.90, precio_D: pA*0.85 };
 
     try {
+        let newId = id;
         if (id) {
             await updateDoc(doc(db, "catalogo", id), dataPublica);
             await updateDoc(doc(db, "precios", id), dataPrecios);
             Swal.fire({ title: 'Producto Actualizado', icon: 'success', timer: 1500, showConfirmButton: false });
         } else {
             const docRef = await addDoc(collection(db, "catalogo"), dataPublica);
-            dataPrecios.producto_id = docRef.id;
-            await setDoc(doc(db, "precios", docRef.id), dataPrecios);
+            newId = docRef.id;
+            dataPrecios.producto_id = newId;
+            await setDoc(doc(db, "precios", newId), dataPrecios);
             
-            // LÓGICA NUEVA: Si venimos de una compra, lo agregamos a la compra actual
+            // Lógica de Flujo Continuo
             if (origenCreacion === 'compra') {
-                COMPRA_ITEMS.push({ id: docRef.id, nombre: nombreProd, costo: costoProd, cantidad: 1 });
+                COMPRA_ITEMS.push({ id: newId, nombre: nombreProd, costo: costoProd, cantidad: 1 });
                 renderCompraItems();
-                Swal.fire({ title: '¡Producto Creado y Agregado!', text: 'Puedes seguir buscando más.', icon: 'success', timer: 2000, showConfirmButton: false });
+                Swal.fire({ title: '¡Producto Creado y Agregado!', text: 'Sigue buscando el siguiente.', icon: 'success', timer: 2000, showConfirmButton: false });
+                document.getElementById('compra-buscar-prod').focus(); // Devuelve el cursor al buscador
             } else if (origenCreacion === 'manual') {
-                MANUAL_ITEMS.push({ id: docRef.id, nombre: nombreProd, codigo: dataPublica.codigo, cantidad: 1, precio_A: pA, precio_B: dataPrecios.precio_B, precio_C: dataPrecios.precio_C, precio_D: dataPrecios.precio_D, exento: dataPublica.exento, stock: dataPublica.stock });
+                MANUAL_ITEMS.push({ id: newId, nombre: nombreProd, codigo: codigoProd, cantidad: 1, precio_A: pA, precio_B: dataPrecios.precio_B, precio_C: dataPrecios.precio_C, precio_D: dataPrecios.precio_D, exento: exentoProd, stock: stockProd });
                 renderManualItems();
-                Swal.fire({ title: '¡Producto Creado y Agregado!', icon: 'success', timer: 2000, showConfirmButton: false });
+                Swal.fire({ title: '¡Producto Creado y Agregado!', text: 'Sigue buscando el siguiente.', icon: 'success', timer: 2000, showConfirmButton: false });
+                document.getElementById('manual-buscar').focus(); // Devuelve el cursor al buscador
             } else {
                 Swal.fire({ title: 'Producto Creado', icon: 'success', timer: 1500, showConfirmButton: false });
             }
@@ -179,7 +185,7 @@ document.getElementById('form-producto').addEventListener('submit', async (e) =>
     }
 });
 
-// --- 2. COTIZACIONES Y BUSCADORES ---
+// --- 2. COTIZACIONES Y BUSCADORES CON CREACIÓN ---
 async function cargarCotizaciones() {
     const tbody = document.getElementById('tbody-cotizaciones');
     const snap = await getDocs(collection(db, "cotizaciones"));
@@ -234,16 +240,13 @@ window.cambiarNivelCliente = () => {
     }
 };
 
-// BUSCADOR MANUAL (CON OPCIÓN DE CREAR NUEVO)
 window.buscarProductoManual = (query) => {
-    buscadorActivo = 'manual';
     const q = (query || '').toLowerCase().trim(); 
     const resDiv = document.getElementById('res-manual');
     
     if (q.length < 1) { resDiv.style.display = 'none'; return; }
-    
     if (Object.keys(PRODUCTOS_CACHE).length === 0) {
-        resDiv.innerHTML = '<div class="search-item" style="color:#ef4444;">Cargando base de datos... espera 2 segundos.</div>';
+        resDiv.innerHTML = '<div class="search-item" style="color:#ef4444;">Cargando base de datos...</div>';
         resDiv.style.display = 'block'; return;
     }
     
@@ -266,8 +269,8 @@ window.abrirModalNuevoProductoBuscador = (nombre, origen) => {
     origenCreacion = origen;
     document.getElementById('res-manual').style.display = 'none';
     document.getElementById('res-compra').style.display = 'none';
-    abrirModalProducto(); // Llama al modal genérico
-    document.getElementById('inv-nombre').value = nombre; // Pre-llena el nombre
+    abrirModalProducto(); // Abre el modal genérico
+    document.getElementById('inv-nombre').value = nombre; // Pre-llena el nombre con lo que escribió el usuario
 };
 
 window.agregarManual = (id) => {
@@ -313,7 +316,7 @@ window.guardarCotizacionManual = async () => {
     Swal.fire('¡Éxito!', 'Cotización creada', 'success');
 };
 
-// --- 3. VENTAS Y PDFs ---
+// --- 3. VENTAS Y DISEÑO DE PDFs (IDÉNTICO AL DE LA SOLUCION) ---
 async function cargarVentas() {
     const tbody = document.getElementById('tbody-ventas'); const snap = await getDocs(collection(db, "cotizaciones"));
     tbody.innerHTML = ''; let tot = 0;
@@ -321,7 +324,15 @@ async function cargarVentas() {
         const c = d.data();
         if (c.estado === 'aprobada' || c.estado === 'facturada') {
             tot += c.total_usd;
-            tbody.innerHTML += `<tr><td>${new Date().toLocaleDateString()}</td><td>${c.email}</td><td>$${c.total_usd.toFixed(2)}</td><td><button class="btn btn-primary btn-sm" onclick="generarPDF('${encodeURIComponent(JSON.stringify(c))}', 'FACTURA')">Factura</button></td></tr>`;
+            tbody.innerHTML += `
+            <tr>
+                <td>${new Date().toLocaleDateString()}</td><td>${c.email}</td><td>$${c.total_usd.toFixed(2)}</td>
+                <td>
+                    <button class="btn btn-outline btn-sm" onclick="generarPDF('${encodeURIComponent(JSON.stringify(c))}', 'COTIZACIÓN')">Cotización</button>
+                    <button class="btn btn-primary btn-sm" onclick="generarPDF('${encodeURIComponent(JSON.stringify(c))}', 'NOTA DE ENTREGA')">Nota de Entrega</button>
+                    <button class="btn btn-success btn-sm" onclick="generarPDF('${encodeURIComponent(JSON.stringify(c))}', 'FACTURA')">Factura</button>
+                </td>
+            </tr>`;
         }
     });
     if(document.getElementById('dash-ingresos')) document.getElementById('dash-ingresos').textContent = `$${tot.toFixed(2)}`;
@@ -331,44 +342,66 @@ window.generarPDF = (str, tipo) => {
     const c = JSON.parse(decodeURIComponent(str));
     const { jsPDF } = window.jspdf; const doc = new jsPDF();
     
-    doc.addImage('img/logo.png', 'PNG', 14, 10, 35, 15);
-    doc.setFontSize(9); doc.setTextColor(80);
-    doc.text("R.I.F: J-50719484-1 | Telf: 0414-3549096", 196, 15, { align: "right" });
-    doc.text("Calle Caracas, Angostura del Orinoco, Ciudad Bolívar", 196, 20, { align: "right" });
-    
-    doc.setFontSize(16); doc.setTextColor(0);
+    // --- DISEÑO IDÉNTICO AL PDF DE LA SOLUCIÓN ---
+    doc.setFontSize(9); doc.setTextColor(0);
+    doc.text("Calle caracas cruce con callejón sin nombre edif. Primer piso 1 of 3, 4 y 5", 14, 15);
+    doc.text("barrio el merecure, angostura del Orinoco ciudad Bolivar", 14, 20);
+    doc.text("Telf: 0414-3549096   R.I.F: J-50719484-1", 14, 25);
+
+    doc.setFontSize(14); doc.setFont("helvetica", "bold");
     doc.text(tipo, 14, 40);
     
-    doc.setFontSize(10); doc.setFont("helvetica", "normal");
+    doc.setFontSize(10); doc.setFont("helvetica", "bold");
     doc.text(`CLIENTE: ${c.email.split('@')[0].toUpperCase()}`, 14, 50);
-    doc.text(`FECHA: ${new Date().toLocaleDateString()}`, 150, 50);
+    doc.setFont("helvetica", "normal");
+    doc.text(`C.I/RIF: ${c.rif_cliente || 'V-00000000'}`, 14, 55);
+    doc.text(`DIRECCIÓN: ${c.direccion_cliente || 'No registrada'}`, 14, 60);
     
+    doc.text(`FECHA: ${new Date().toLocaleDateString()}`, 150, 50);
+
     let base = 0; let exento = 0;
     const filas = c.productos_con_precio.map(p => {
         if(p.exento) exento += p.subtotal; else base += p.subtotal;
+        // Formato: Cantidad, Descripción, SKU, Precio, Total
         return [p.cantidad, p.nombre, p.codigo || '-', `$${p.precio_unitario.toFixed(2)}`, `$${p.subtotal.toFixed(2)}`];
     });
 
-    doc.autoTable({ startY: 60, head: [["CANT.", "DESCRIPCIÓN", "SKU", "PRECIO USD", "TOTAL USD"]], body: filas, theme: 'grid', headStyles: { fillColor: [26, 43, 76], textColor: [255,255,255] }, styles: { fontSize: 9 } });
+    doc.autoTable({
+        startY: 70,
+        head: [["CANTIDAD", "DESCRIPCIÓN", "SKU", "PRECIO USD", "TOTAL USD"]],
+        body: filas,
+        theme: 'plain',
+        headStyles: { fontStyle: 'bold', textColor: [0,0,0], lineWidth: { bottom: 1 } },
+        bodyStyles: { textColor: [50,50,50], lineWidth: { bottom: 0.1 } },
+        columnStyles: { 0: { halign: 'center' }, 3: { halign: 'right' }, 4: { halign: 'right' } }
+    });
 
-    let y = doc.lastAutoTable.finalY + 10; doc.setFont("helvetica", "bold");
+    let y = doc.lastAutoTable.finalY + 10; 
+    doc.setFontSize(10); doc.setFont("helvetica", "bold");
     
-    if(tipo === 'FACTURA') {
+    doc.text(`TOTAL DE ITEMS: ${c.productos_con_precio.length}`, 14, y);
+    doc.text(`SUBTOTAL USD: $${c.total_usd.toFixed(2)}`, 196, y, { align: "right" });
+    doc.text(`TOTAL USD: $${c.total_usd.toFixed(2)}`, 196, y+6, { align: "right" });
+
+    if (tipo === 'FACTURA') {
         const iva = base * 0.16; const totalFactura = base + exento + iva;
-        doc.text(`Base Imponible: $${base.toFixed(2)}`, 130, y);
-        doc.text(`Monto Exento: $${exento.toFixed(2)}`, 130, y+6);
-        doc.text(`IVA (16%): $${iva.toFixed(2)}`, 130, y+12);
-        doc.setFontSize(12);
-        doc.text(`TOTAL FACTURA: $${totalFactura.toFixed(2)}`, 130, y+22);
-        doc.text(`TOTAL Bs: Bs. ${(totalFactura * TASA_BCV).toFixed(2)}`, 130, y+28);
+        doc.text(`Base Imponible: $${base.toFixed(2)}`, 196, y+16, { align: "right" });
+        doc.text(`Monto Exento: $${exento.toFixed(2)}`, 196, y+22, { align: "right" });
+        doc.text(`IVA (16%): $${iva.toFixed(2)}`, 196, y+28, { align: "right" });
+        doc.text(`TOTAL FACTURA: $${totalFactura.toFixed(2)}`, 196, y+36, { align: "right" });
+        doc.text(`TOTAL Bs: Bs. ${(totalFactura * TASA_BCV).toFixed(2)}`, 196, y+42, { align: "right" });
     } else {
-        doc.text(`SUBTOTAL USD: $${c.total_usd.toFixed(2)}`, 130, y);
-        doc.setFontSize(12); doc.text(`TOTAL Bs: Bs. ${(c.total_usd * TASA_BCV).toFixed(2)}`, 130, y+8);
+        doc.text(`TOTAL Bs: Bs. ${(c.total_usd * TASA_BCV).toFixed(2)}`, 196, y+12, { align: "right" });
     }
-    doc.save(`${tipo}_${c.email.split('@')[0]}.pdf`);
+
+    doc.setFont("helvetica", "normal");
+    doc.text("Observaciones:", 14, y + 40);
+    doc.line(14, y + 42, 196, y + 42);
+    
+    doc.save(`${tipo.replace(' ', '_')}_${c.email.split('@')[0]}.pdf`);
 };
 
-// --- 4. PROVEEDORES, COMPRAS Y CLIENTES ---
+// --- 4. PROVEEDORES Y COMPRAS (FLUJO CONTINUO) ---
 async function cargarClientesYProveedores() {
     const snapC = await getDocs(collection(db, "usuarios"));
     const tbodyC = document.getElementById('tbody-clientes'); tbodyC.innerHTML = ''; CLIENTES_CACHE = {};
@@ -408,16 +441,13 @@ document.getElementById('form-proveedor').addEventListener('submit', async (e) =
     document.getElementById('form-proveedor').reset(); cargarClientesYProveedores();
 });
 
-// BUSCADOR COMPRAS (CON OPCIÓN DE CREAR NUEVO)
 window.buscarProductoCompra = (query) => {
-    buscadorActivo = 'compra';
     const q = (query || '').toLowerCase().trim(); 
     const resDiv = document.getElementById('res-compra');
     
     if (q.length < 1) { resDiv.style.display = 'none'; return; }
-    
     if (Object.keys(PRODUCTOS_CACHE).length === 0) {
-        resDiv.innerHTML = '<div class="search-item" style="color:#ef4444;">Cargando base de datos...</div>';
+        resDiv.innerHTML = '<div class="search-item" style="color:#ef4444;">Cargando...</div>';
         resDiv.style.display = 'block'; return;
     }
     
@@ -521,7 +551,6 @@ window.generarInformeTecnico = (str) => {
         doc.setFont("helvetica", "bold"); doc.text(`Observaciones:`, 14, 120);
         doc.setFont("helvetica", "normal"); doc.text(t.observaciones, 14, 126, { maxWidth: 180 });
     }
-    
     doc.save(`Informe_${t.cliente.replace(/ /g, '_')}.pdf`);
 };
 
